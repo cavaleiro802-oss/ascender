@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import crypto from "crypto";
+import * as crypto from "crypto";
 import { checkRateLimit, LIMITS } from "./rateLimit";
 
 
