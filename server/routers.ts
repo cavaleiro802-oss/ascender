@@ -234,7 +234,11 @@ const comentariosRouter = router({
       // ✅ Rate limit: 10 comentários por minuto
       const rl = checkRateLimit({ key: `comentario:${ctx.user.id}`, ...LIMITS.comentario });
       if (!rl.allowed) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `Muitos comentários. Aguarde ${rl.retryAfterSec}s.` });
-      await createComentario({ ...input, autorId: ctx.user.id });
+      await createComentario({ 
+        autorId: ctx.user.id,
+        obraId: input.obraId,
+        content: input.content,
+      });
       return { success: true };
     }),
   delete: protectedProcedure
