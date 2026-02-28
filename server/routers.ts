@@ -326,7 +326,8 @@ const pedidoCargoRouter = router({
     const bloqueadoAte = ctx.user.ultimoPedidoCargo
       ? new Date(new Date(ctx.user.ultimoPedidoCargo).getTime() + 10 * 24 * 60 * 60 * 1000)
       : null;
-    return { status: meu?.status ?? null, bloqueadoAte };
+    return { status: meu ? meu.status :
+    null, bloqueadoAte };
   }),
 });
 
