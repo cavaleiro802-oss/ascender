@@ -464,7 +464,6 @@ export const appRouter = router({
         await updateUserProfile(ctx.user.id, input);
         return { success: true };
       }),
-  }),
   obras: obrasRouter,
   capitulos: capitulosRouter,
   comentarios: comentariosRouter,
