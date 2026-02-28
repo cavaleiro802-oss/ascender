@@ -276,8 +276,14 @@ const leituraRouter = router({
   history: protectedProcedure.query(({ ctx }) => getHistoricoLeitura(ctx.user.id)),
   upsert: protectedProcedure
     .input(z.object({ obraId: z.number(), capituloId: z.number(), progresso: z.number().min(0).max(100) }))
-    .mutation(({ ctx, input }) => upsertHistoricoLeitura({ ...input, userId: ctx.user.id })),
-});
+    .mutation(({ ctx, input }) => 
+      upsertHistoricoLeitura({ 
+    userId: ctx.user,id,
+    obraId: input.obraId,
+    capituloId: input.capituloId,
+    progresso: input.progresso,
+ })
+),
 
 // ─── Reports Router ───────────────────────────────────────────────────────────
 const reportsRouter = router({
