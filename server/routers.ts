@@ -215,7 +215,10 @@ const capitulosRouter = router({
     const ip = (ctx.req as any).ip ?? "unknown";
     const ipHash = crypto.createHash("sha256").update(ip).digest("hex").slice(0, 16);
     const rl = checkRateLimit({ key: `view:cap:${ipHash}:${input.id}`, ...LIMITS.view });
-    if (!rl.allowed) return { skipped: true };
+    if (!rl.allowed) {
+       throw new TRPCError({ code:
+     "TOO_MANY_REQUESTS" });
+    }
     return incrementCapituloViews(input.id);
   }),
   pending: protectedProcedure.query(({ ctx }) => { if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" }); return listPendingCapitulos(); }),
