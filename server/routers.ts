@@ -341,7 +341,7 @@ const notificacoesRouter = router({
     await Promise.all(notifs.filter((n: any) => !n.lida).map((n: any) => marcarNotificacaoLida(n.id, ctx.user.id)));
     return { success: true };
   }),
-);
+})
 
 // ─── Admin Router ─────────────────────────────────────────────────────────────
 const adminRouter = router({
