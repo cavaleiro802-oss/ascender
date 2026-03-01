@@ -327,7 +327,7 @@ const pedidoCargoRouter = router({
     return { status: meu ? meu.status :
     null, bloqueadoAte };
   }),
-);
+)
 
 // ─── Notificações Router ──────────────────────────────────────────────────────
 const notificacoesRouter = router({
