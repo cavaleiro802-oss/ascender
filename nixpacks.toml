@@ -5,8 +5,7 @@ nixPkgs = ["nodejs_20"]
 cmds = ["npm install"]
 
 [phases.build]
-cmds = ["npm run build:client"]
+cmds = ["npm run build:client", "ls -la dist/ || echo 'dist nao existe'", "ls -la dist/client/ || echo 'dist/client nao existe'"]
 
 [start]
 cmd = "node_modules/.bin/tsx server/index.ts"
-
