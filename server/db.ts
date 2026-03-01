@@ -16,7 +16,7 @@ import {
   publicLinks,
   reports,
   users,
-} from "../../drizzle/schema";
+} from "../drizzle/schema";
 let _db: ReturnType<typeof drizzle> | null = null;
 
 export async function getDb() {
@@ -499,3 +499,4 @@ export async function limparSessoesExpiradas() {
   if (!db) return;
   await db.delete(sessoes).where(lt(sessoes.expiresAt, new Date()));
 }
+
