@@ -113,7 +113,7 @@ const obrasRouter = router({
       const rl = checkRateLimit({ key: `criarObra:${ctx.user.id}`, ...LIMITS.criarObra });
       if (!rl.allowed) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `Limite de criação atingido. Tente em ${rl.retryAfterSec}s.` });
       const status = isOfficialOrAbove(ctx.user.role) ? "aprovada" : "em_espera";
-      await createObra({ ...input, authorId: ctx.user.id, status });
+      await createObra({ title: input.title, synopsis: input.synopsis, genres: input.genres, coverUrl: input.coverUrl, originalAuthor: input.originalAuthor, authorId: ctx.user.id, status });
       return { success: true, status };
     }),
 
