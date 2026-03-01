@@ -109,7 +109,7 @@ app.use((err: any, _req: any, res: any, _next: any) => {
 
 // 🔥 SERVIR FRONTEND EM PRODUÇÃO
 if (process.env.NODE_ENV === "production") {
-  const clientPath = path.join(process.cwd(), "dist", "client");
+  const clientPath = path.join(process.cwd(), "dist");
 
   app.use(express.static(clientPath));
 
