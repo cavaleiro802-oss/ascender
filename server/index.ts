@@ -55,7 +55,7 @@ app.use(helmet({
       defaultSrc: ["'self'"],
       // ✅ SITE_URL e domínio do backend na connectSrc
       connectSrc: ["'self'", SITE_URL, "https://accounts.google.com"].filter(Boolean),
-      imgSrc: ["'self'", "data:", "https://pub-*.r2.dev", "*.r2.dev", "lh3.googleusercontent.com"],
+      imgSrc: ["'self'", "data:", "https://*.r2.dev", "lh3.googleusercontent.com"],
       scriptSrc: ["'self'", "https://accounts.google.com"],
       frameSrc: ["https://accounts.google.com"],
     },
@@ -65,9 +65,9 @@ app.use(helmet({
 // ─── CORS ────────────────────────────────────────────────────────────────────
 app.use(cors({
   origin: (origin, cb) => {
-    // ✅ Em produção, bloqueia requisições sem Origin (exceto dev/Postman)
-    if (isProd && !origin) return cb(new Error("CORS: origem não permitida."));
-    if (!origin || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+    // ✅ Permite navegação normal do browser e healthchecks (sem Origin)
+    if (!origin) return cb(null, true);
+    if (ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
     cb(new Error("CORS: origem não permitida."));
   },
   credentials: true,
@@ -94,7 +94,8 @@ app.use("/trpc", createExpressMiddleware({ router: appRouter, createContext }));
 
 // ─── Frontend em produção ─────────────────────────────────────────────────────
 if (isProd) {
-  const clientDist = path.join(__dirname, "../../../dist/client");
+  const clientDist = path.resolve(__dirname, "../../../dist/client");
+  console.log("clientDist:", clientDist); // log para debug no Railway
   app.use(express.static(clientDist, { maxAge: "7d", etag: true }));
   app.get("*", (_req, res) => res.sendFile(path.join(clientDist, "index.html")));
 }
