@@ -34,8 +34,7 @@ if (isProd) {
     temErro = true;
   }
   if (temErro) {
-    console.error("\n🛑 Servidor abortado: defina as variáveis acima no Railway → Variables\n");
-    process.exit(1);
+    console.error("\n⚠️  Servidor iniciando com configuração incompleta. Algumas funcionalidades podem não funcionar.\n");
   }
 }
 
@@ -88,16 +87,24 @@ app.use((req, res, next) => {
 });
 
 // ─── Rotas ────────────────────────────────────────────────────────────────────
+app.get("/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/auth", authRouter);
 app.use("/api/upload", uploadRouter);
 app.use("/trpc", createExpressMiddleware({ router: appRouter, createContext }));
 
 // ─── Frontend em produção ─────────────────────────────────────────────────────
 if (isProd) {
-  const clientDist = path.resolve(__dirname, "../client");
-  console.log("clientDist:", clientDist); // log para debug no Railway
+  const clientDist = path.join(process.cwd(), "dist/client");
+  console.log("clientDist =", clientDist, "| exists?", require("fs").existsSync(clientDist));
   app.use(express.static(clientDist, { maxAge: "7d", etag: true }));
-  app.get("*", (_req, res) => res.sendFile(path.join(clientDist, "index.html")));
+  app.get("*", (_req, res) => {
+    const indexFile = path.join(clientDist, "index.html");
+    if (require("fs").existsSync(indexFile)) {
+      res.sendFile(indexFile);
+    } else {
+      res.status(404).send("Frontend não encontrado. Verifique o build.");
+    }
+  });
 }
 
 // ─── Erro global ──────────────────────────────────────────────────────────────
@@ -105,19 +112,6 @@ app.use((err: any, _req: any, res: any, _next: any) => {
   console.error("[Server]", err.message);
   res.status(err.status ?? 500).json({ error: err.message ?? "Erro interno." });
 });
-
-
-// 🔥 SERVIR FRONTEND EM PRODUÇÃO
-if (process.env.NODE_ENV === "production") {
-  const clientPath = path.join(process.cwd(), "dist");
-
-  app.use(express.static(clientPath));
-
-  app.get("*", (_req, res) => {
-    res.sendFile(path.join(clientPath, "index.html"));
-  });
-}
-
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ ASCENDER rodando na porta ${PORT} (${isProd ? "produção" : "desenvolvimento"})`);
