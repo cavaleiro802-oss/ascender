@@ -136,12 +136,13 @@ const obrasRouter = router({
       return { success: true };
     }),
 
-  incrementViews: publicProcedure.input(z.object({ id: z.number() })).mutation(({ ctx, input }) => {
+  incrementViews: publicProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
     const ip = (ctx.req as any).ip ?? "unknown";
     const ipHash = crypto.createHash("sha256").update(ip).digest("hex").slice(0, 16);
     const rl = checkRateLimit({ key: `view:obra:${ipHash}:${input.id}`, ...LIMITS.view });
     if (!rl.allowed) return { skipped: true };
-    return incrementObraViews(input.id);
+    await incrementObraViews(input.id);
+    return { skipped: false };
   }),
   pending: protectedProcedure.query(({ ctx }) => { if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" }); return listPendingObras(); }),
   minhas: protectedProcedure.query(({ ctx }) => { if (!isTranslatorOrAbove(ctx.user.role)) return []; return listObrasByAuthor(ctx.user.id); }),
@@ -211,12 +212,13 @@ const capitulosRouter = router({
       return { success: true };
     }),
 
-  incrementViews: publicProcedure.input(z.object({ id: z.number() })).mutation(({ ctx, input }) => {
+  incrementViews: publicProcedure.input(z.object({ id: z.number() })).mutation(async ({ ctx, input }) => {
     const ip = (ctx.req as any).ip ?? "unknown";
     const ipHash = crypto.createHash("sha256").update(ip).digest("hex").slice(0, 16);
     const rl = checkRateLimit({ key: `view:cap:${ipHash}:${input.id}`, ...LIMITS.view });
     if (!rl.allowed) return { skipped: true };
-    return incrementCapituloViews(input.id);
+    await incrementCapituloViews(input.id);
+    return { skipped: false };
   }),
   pending: protectedProcedure.query(({ ctx }) => { if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" }); return listPendingCapitulos(); }),
 });
@@ -231,7 +233,7 @@ const comentariosRouter = router({
       // ✅ Rate limit: 10 comentários por minuto
       const rl = checkRateLimit({ key: `comentario:${ctx.user.id}`, ...LIMITS.comentario });
       if (!rl.allowed) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `Muitos comentários. Aguarde ${rl.retryAfterSec}s.` });
-      await createComentario({ ...input, autorId: ctx.user.id });
+      await createComentario({ obraId: input.obraId, autorId: ctx.user.id, content: input.content });
       return { success: true };
     }),
   delete: protectedProcedure
@@ -269,7 +271,7 @@ const leituraRouter = router({
   history: protectedProcedure.query(({ ctx }) => getHistoricoLeitura(ctx.user.id)),
   upsert: protectedProcedure
     .input(z.object({ obraId: z.number(), capituloId: z.number(), progresso: z.number().min(0).max(100) }))
-    .mutation(({ ctx, input }) => upsertHistoricoLeitura({ ...input, userId: ctx.user.id })),
+    .mutation(({ ctx, input }) => upsertHistoricoLeitura({ userId: ctx.user.id, obraId: input.obraId, capituloId: input.capituloId, progresso: input.progresso })),
 });
 
 // ─── Reports Router ───────────────────────────────────────────────────────────
@@ -281,7 +283,7 @@ const reportsRouter = router({
       // ✅ Rate limit: 3 denúncias por hora
       const rl = checkRateLimit({ key: `denuncia:${ctx.user.id}`, ...LIMITS.denuncia });
       if (!rl.allowed) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `Limite de denúncias atingido. Aguarde ${rl.retryAfterSec}s.` });
-      await createReport({ ...input, userId: ctx.user.id });
+      await createReport({ capituloId: input.capituloId, obraId: input.obraId, userId: ctx.user.id, tipo: input.tipo, descricao: input.descricao });
       return { success: true };
     }),
 });
