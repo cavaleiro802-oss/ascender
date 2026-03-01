@@ -328,7 +328,6 @@ const pedidoCargoRouter = router({
     null, bloqueadoAte };
   }),
 });
-
 // ─── Notificações Router ──────────────────────────────────────────────────────
 const notificacoesRouter = router({
   list: protectedProcedure.query(({ ctx }) => listNotificacoes(ctx.user.id)),
