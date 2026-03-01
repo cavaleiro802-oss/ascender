@@ -4,7 +4,7 @@
     "module": "CommonJS",
     "moduleResolution": "node",
     "outDir": "dist/server",
-    "rootDir": ".",
+    "rootDir": "server",
     "strict": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
