@@ -5,9 +5,13 @@
     "moduleResolution": "node",
     "outDir": "dist/server",
     "rootDir": "server",
-    "strict": false,
+    "strict": true,
     "skipLibCheck": true,
     "resolveJsonModule": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "lib": ["ES2020"],
+    "types": ["node"],
     "baseUrl": ".",
     "paths": {
       "@shared/*": ["./shared/*"]
