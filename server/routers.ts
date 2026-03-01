@@ -281,7 +281,7 @@ const leituraRouter = router({
     capituloId: input.capituloId,
     progresso: input.progresso,
  })
-),
+}),
 
 // ─── Reports Router ───────────────────────────────────────────────────────────
 const reportsRouter = router({
