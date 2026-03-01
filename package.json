@@ -7,7 +7,7 @@
     "dev:client": "vite",
     "dev:server": "tsx watch server/index.ts",
     "build": "vite build && tsc -p tsconfig.server.json",
-    "start": "node dist/server/index.js",
+    "start": "node dist/server/server/index.js",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
   },
@@ -60,6 +60,7 @@
     "tsx": "^4.7.0",
     "typescript": "^5.3.3",
     "vite": "^5.1.0",
-    "@types/cookie-signature": "^1.1.2"
+    "@types/cookie-signature": "^1.1.2",
+    "@types/helmet": "^0.0.1"
   }
 }
