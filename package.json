@@ -6,7 +6,7 @@
     "dev": "concurrently \"npm run dev:server\" \"npm run dev:client\"",
     "dev:client": "vite",
     "dev:server": "tsx watch server/index.ts",
-    "build": "vite build && tsc -p tsconfig.server.json",
+    "build": "npm --prefix client install && npm --prefix client run build && tsc -p tsconfig.server.json",
     "start": "node dist/server/index.js",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
