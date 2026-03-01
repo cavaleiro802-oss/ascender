@@ -330,7 +330,7 @@ const pedidoCargoRouter = router({
 )
 
 // ─── Notificações Router ──────────────────────────────────────────────────────
-const notificacoesRouter = router({
+  const notificacoesRouter = router({
   list: protectedProcedure.query(({ ctx }) => listNotificacoes(ctx.user.id)),
   countNaoLidas: protectedProcedure.query(({ ctx }) => countNotificacoesNaoLidas(ctx.user.id)),
   marcarLida: protectedProcedure
@@ -341,7 +341,7 @@ const notificacoesRouter = router({
     await Promise.all(notifs.filter((n: any) => !n.lida).map((n: any) => marcarNotificacaoLida(n.id, ctx.user.id)));
     return { success: true };
   }),
-})
+}),
 
 // ─── Admin Router ─────────────────────────────────────────────────────────────
 const adminRouter = router({
