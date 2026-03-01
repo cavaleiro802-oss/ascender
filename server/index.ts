@@ -94,7 +94,7 @@ app.use("/trpc", createExpressMiddleware({ router: appRouter, createContext }));
 
 // ─── Frontend em produção ─────────────────────────────────────────────────────
 if (isProd) {
-  const clientDist = path.join(__dirname, "../../dist/client");
+  const clientDist = path.join(__dirname, "../../../dist/client");
   app.use(express.static(clientDist, { maxAge: "7d", etag: true }));
   app.get("*", (_req, res) => res.sendFile(path.join(clientDist, "index.html")));
 }
@@ -105,7 +105,7 @@ app.use((err: any, _req: any, res: any, _next: any) => {
   res.status(err.status ?? 500).json({ error: err.message ?? "Erro interno." });
 });
 
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ ASCENDER rodando na porta ${PORT} (${isProd ? "produção" : "desenvolvimento"})`);
   console.log(`   Banco:  ${process.env.DATABASE_URL ? "✅" : "⚠️  não definido"}`);
   console.log(`   R2:     ${process.env.R2_ENDPOINT ? "✅" : "⚠️  não configurado"}`);
