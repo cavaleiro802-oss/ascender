@@ -94,7 +94,7 @@ app.use("/trpc", createExpressMiddleware({ router: appRouter, createContext }));
 
 // ─── Frontend em produção ─────────────────────────────────────────────────────
 if (isProd) {
-  const clientDist = path.resolve(__dirname, "../../../dist/client");
+  const clientDist = path.resolve(__dirname, "../client");
   console.log("clientDist:", clientDist); // log para debug no Railway
   app.use(express.static(clientDist, { maxAge: "7d", etag: true }));
   app.get("*", (_req, res) => res.sendFile(path.join(clientDist, "index.html")));
