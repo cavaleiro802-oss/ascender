@@ -8,7 +8,7 @@
     "dev:server": "tsx watch server/index.ts",
     "build": "vite build && tsc -p tsconfig.server.json",
     "build:client": "vite build",
-    "start": "npx tsx server/index.ts",
+    "start": "node dist/server/index.Js",
     "db:push": "drizzle-kit push",
     "db:studio": "drizzle-kit studio"
   },
