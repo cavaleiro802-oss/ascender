@@ -281,7 +281,7 @@ const leituraRouter = router({
     capituloId: input.capituloId,
     progresso: input.progresso,
  })
-}),
+),
 
 // ─── Reports Router ───────────────────────────────────────────────────────────
 const reportsRouter = router({
@@ -327,7 +327,7 @@ const pedidoCargoRouter = router({
     return { status: meu ? meu.status :
     null, bloqueadoAte };
   }),
-});
+);
 
 // ─── Notificações Router ──────────────────────────────────────────────────────
 const notificacoesRouter = router({
@@ -341,7 +341,7 @@ const notificacoesRouter = router({
     await Promise.all(notifs.filter((n: any) => !n.lida).map((n: any) => marcarNotificacaoLida(n.id, ctx.user.id)));
     return { success: true };
   }),
-});
+);
 
 // ─── Admin Router ─────────────────────────────────────────────────────────────
 const adminRouter = router({
