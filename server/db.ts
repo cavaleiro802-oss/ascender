@@ -20,11 +20,50 @@ import {
 let _db: ReturnType<typeof drizzle> | null = null;
 
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
-    try { _db = drizzle(process.env.DATABASE_URL); }
-    catch (error) { console.warn("[Database] Failed to connect:", error); _db = null; }
+  if (_db) return _db;
+
+  try {
+    // 1) tenta variáveis separadas (Railway MySQL)
+    const host = process.env.MYSQLHOST;
+    const port = Number(process.env.MYSQLPORT ?? 3306);
+    const user = process.env.MYSQLUSER;
+    const password = process.env.MYSQLPASSWORD;
+    const database = process.env.MYSQLDATABASE;
+
+    if (host && user && password && database) {
+      const mysql = await import("mysql2/promise");
+      const pool = mysql.createPool({
+        host,
+        port,
+        user,
+        password,
+        database,
+        // Railway MySQL geralmente precisa disso
+        ssl: { rejectUnauthorized: false },
+        waitForConnections: true,
+        connectionLimit: 10,
+        queueLimit: 0,
+      });
+
+      _db = drizzle(pool);
+      console.log("[Database] Conectado via variáveis separadas ✅");
+      return _db;
+    }
+
+    // 2) fallback: DATABASE_URL (se existir)
+    if (process.env.DATABASE_URL) {
+      _db = drizzle(process.env.DATABASE_URL);
+      console.log("[Database] Conectado via DATABASE_URL ✅");
+      return _db;
+    }
+
+    console.warn("[Database] Sem variáveis de conexão definidas ⚠️");
+    return null;
+  } catch (error) {
+    console.warn("[Database] Failed to connect:", error);
+    _db = null;
+    return null;
   }
-  return _db;
 }
 
 // ─── Users ───────────────────────────────────────────────────────────────────
