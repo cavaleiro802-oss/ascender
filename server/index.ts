@@ -41,9 +41,13 @@ if (isProd) {
 const app = express();
 const PORT = parseInt(process.env.PORT || "3001");
 const SITE_URL = process.env.SITE_URL ?? "";
+const RAILWAY_URL =
+  process.env.RAILWAY_PUBLIC_DOMAIN
+    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+    : "";
 
 const ALLOWED_ORIGINS = isProd
-  ? [SITE_URL].filter(Boolean)
+  ? [SITE_URL, RAILWAY_URL].filter(Boolean)
   : ["http://localhost:5173", "http://localhost:3001"];
 
 // ─── Helmet — headers de segurança ───────────────────────────────────────────
