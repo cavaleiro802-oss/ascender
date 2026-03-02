@@ -4,13 +4,7 @@ nixPkgs = ["nodejs_20"]
 [phases.install]
 cmds = ["npm install"]
 
-[phases.build]
-cmds = [
-  "node diagnose.mjs",
-  "npm run build:client",
-  "node diagnose.mjs"
-]
-
 [start]
 cmd = "npx tsx server/index.ts"
+
 
