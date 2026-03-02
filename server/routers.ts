@@ -80,7 +80,7 @@ const obrasRouter = router({
       search: z.string().max(100).optional(),
       sort: z.enum(["hot", "recent", "most"]).optional(),
       page: z.number().int().min(1).optional(),
-      limit: z.number().int().min(1).max(50).optional(), // ✅ máximo 50 por requisição
+      limit: z.number().int().min(1).max(200).optional(), // ✅ máximo 50 por requisição
     }))
     .query(({ input }) => listObras({ ...input, status: "aprovada" })),
 
