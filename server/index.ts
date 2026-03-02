@@ -39,6 +39,10 @@ if (isProd) {
 }
 
 const app = express();
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
+
 const PORT = parseInt(process.env.PORT || "3001");
 const SITE_URL = process.env.SITE_URL ?? "";
 const RAILWAY_URL =
