@@ -1,0 +1,7 @@
+node_modules/
+dist/*
+!dist/client
+.env
+.env.local
+*.local
+drizzle/migrations/
