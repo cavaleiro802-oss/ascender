@@ -39,19 +39,16 @@ if (isProd) {
 }
 
 const app = express();
-if (process.env.NODE_ENV === "production") {
-  app.set("trust proxy", 1);
-}
-
 const PORT = parseInt(process.env.PORT || "3001");
 const SITE_URL = process.env.SITE_URL ?? "";
-const RAILWAY_URL =
-  process.env.RAILWAY_PUBLIC_DOMAIN
-    ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
-    : "";
+const RAILWAY_DOMAIN = process.env.RAILWAY_PUBLIC_DOMAIN
+  ? `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`
+  : "";
+
+if (isProd) app.set("trust proxy", 1);
 
 const ALLOWED_ORIGINS = isProd
-  ? [SITE_URL, RAILWAY_URL].filter(Boolean)
+  ? [SITE_URL, RAILWAY_DOMAIN].filter(Boolean)
   : ["http://localhost:5173", "http://localhost:3001"];
 
 // ─── Helmet — headers de segurança ───────────────────────────────────────────
@@ -98,7 +95,20 @@ app.use((req, res, next) => {
 app.get("/health", (_req, res) => res.json({ ok: true }));
 app.use("/api/auth", authRouter);
 app.use("/api/upload", uploadRouter);
-app.use("/trpc", createExpressMiddleware({ router: appRouter, createContext }));
+app.use("/trpc", createExpressMiddleware({
+  router: appRouter,
+  createContext,
+  onError({ error, path, type, input }) {
+    console.error("🔥🔥 TRPC ERROR");
+    console.error("path:", path);
+    console.error("type:", type);
+    console.error("input:", JSON.stringify(input));
+    console.error("message:", error.message);
+    console.error("code:", error.code);
+    console.error("cause:", (error as any).cause);
+    console.error("stack:", error.stack);
+  },
+}));
 
 // ─── Frontend em produção ─────────────────────────────────────────────────────
 if (isProd) {
