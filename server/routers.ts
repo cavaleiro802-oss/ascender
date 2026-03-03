@@ -348,7 +348,7 @@ const adminRouter = router({
       if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
       // ✅ Não pode promover a si mesmo
       if (input.userId === ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "Você não pode alterar seu próprio cargo." });
-      if (!isSupremeAdmin(ctx.user.role) && (input.role === "admin" || input.role === "admin_supremo")) throw new TRPCError({ code: "FORBIDDEN", message: "Apenas Admin Supremo pode promover a Admin." });
+      if (!isSupremeAdmin(ctx.user.role) && (input.role === "admin_senhor" || input.role === "admin_supremo")) throw new TRPCError({ code: "FORBIDDEN", message: "Apenas Admin Supremo pode promover a Admin." });
       if (input.role === "admin_supremo") throw new TRPCError({ code: "FORBIDDEN", message: "O cargo de Admin Supremo não pode ser atribuído por aqui." });
       await updateUserRole(input.userId, input.role);
       await logAdm({ adminId: ctx.user.id, acao: "alterar_role", detalhes: `Novo role: ${input.role}`, targetType: "usuario", targetId: input.userId });
