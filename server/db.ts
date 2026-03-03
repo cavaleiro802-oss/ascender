@@ -33,9 +33,9 @@ export async function getDb() {
       if (connectionString) {
         const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
         _db = drizzle(pool, { schema }); // CORRIGIDO: passa schema
-        console.log("[Database] Conectado via PostgreSQL ✅");
+        console.log("[Database] Conectado via PostgreSQL ");
       } else {
-        console.warn("[Database] DATABASE_URL não definida ⚠️");
+        console.warn("[Database] DATABASE_URL não definida ");
       }
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
