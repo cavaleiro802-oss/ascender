@@ -57,7 +57,12 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   else if (user.openId === (process.env.OWNER_OPEN_ID ?? "")) { values.role = "admin_supremo"; updateSet.role = "admin_supremo"; }
   if (!values.lastSignedIn) values.lastSignedIn = new Date();
   if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
-  await db.insert(users).values(values).onDuplicateKeyUpdate({ set: updateSet });
+    await db.insert(users)
+    .values(values)
+    .onConflictDoUpdate({
+      target: users.openId,
+      set: updateSet,
+    });
 }
 
 export async function getUserByOpenId(openId: string) {
@@ -233,8 +238,11 @@ export async function getObraById(id: number) {
 export async function createObra(data: { title: string; synopsis?: string; genres?: string[]; coverUrl?: string; authorId: number; originalAuthor?: string; status: "em_espera" | "aprovada"; }) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const result = await db.insert(obras).values({ ...data, genres: data.genres ? JSON.stringify(data.genres) : null });
-  return result[0];
+  const [row] = await db
+    .insert(obras)
+    .values({ ...data, genres: data.genres ? JSON.stringify(data.genres) : null })
+    .returning();
+  return row;
 }
 
 export async function updateObraStatus(obraId: number, status: "em_espera" | "aprovada" | "rejeitada") {
@@ -255,25 +263,15 @@ export async function incrementObraViews(obraId: number) {
   await db.update(obras).set({ viewsTotal: sql`${obras.viewsTotal} + 1`, viewsWeek: sql`${obras.viewsWeek} + 1`, updatedAt: new Date() }).where(eq(obras.id, obraId));
 }
 
-export async function resetWeeklyViews() {
-  const db = await getDb();
-  if (!db) return;
-  await db.update(obras).set({ viewsWeek: 0 });
-}
-
-export async function listPendingObras() {
-  const db = await getDb();
-  if (!db) return [];
-  return db.select().from(obras).where(eq(obras.status, "em_espera")).orderBy(obras.createdAt);
-}
-
 // ─── Capítulos ───────────────────────────────────────────────────────────────
-export async function listCapitulos(obraId: number, includeAll = false) {
+export async function createCapitulo(data: { obraId: number; authorId: number; numero: number; title?: string; paginas?: string[]; }) {
   const db = await getDb();
-  if (!db) return [];
-  const conds = [eq(capitulos.obraId, obraId)];
-  if (!includeAll) conds.push(eq(capitulos.status, "aprovado"));
-  return db.select().from(capitulos).where(and(...conds)).orderBy(capitulos.numero);
+  if (!db) throw new Error("DB unavailable");
+  const [row] = await db
+    .insert(capitulos)
+    .values({ ...data, paginas: data.paginas ? JSON.stringify(data.paginas) : null })
+    .returning();
+  return row;
 }
 
 export async function getCapituloById(id: number) {
@@ -283,102 +281,59 @@ export async function getCapituloById(id: number) {
   return result[0];
 }
 
-export async function createCapitulo(data: { obraId: number; authorId: number; numero: number; title?: string; paginas?: string; paginasKeys?: string; status: "aguardando" | "aprovado"; }) {
-  const db = await getDb();
-  if (!db) throw new Error("DB unavailable");
-  const result = await db.insert(capitulos).values(data);
-  return result[0];
-}
-
-// ✅ Conta capítulos aguardando aprovação de um autor específico
-export async function countCapitulosAguardando(authorId: number) {
-  const db = await getDb();
-  if (!db) return 0;
-  const result = await db.select({ count: sql<number>`count(*)` }).from(capitulos)
-    .where(and(eq(capitulos.authorId, authorId), eq(capitulos.status, "aguardando")));
-  return result[0]?.count ?? 0;
-}
-
-export async function updateCapituloStatus(capId: number, status: "aguardando" | "aprovado" | "rejeitado") {
-  const db = await getDb();
-  if (!db) return;
-  await db.update(capitulos).set({ status, updatedAt: new Date() }).where(eq(capitulos.id, capId));
-}
-
-export async function incrementCapituloViews(capId: number) {
-  const db = await getDb();
-  if (!db) return;
-  await db.update(capitulos).set({ viewsTotal: sql`${capitulos.viewsTotal} + 1` }).where(eq(capitulos.id, capId));
-}
-
-export async function listPendingCapitulos() {
+export async function listCapitulos(obraId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(capitulos).where(eq(capitulos.status, "aguardando")).orderBy(capitulos.createdAt);
+  return db.select().from(capitulos).where(eq(capitulos.obraId, obraId)).orderBy(desc(capitulos.numero));
+}
+
+export async function updateCapituloStatus(capituloId: number, status: "aguardando" | "aprovado" | "rejeitado") {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(capitulos).set({ status, updatedAt: new Date() }).where(eq(capitulos.id, capituloId));
+}
+
+export async function updateCapituloPages(capituloId: number, paginas: string[]) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(capitulos).set({ paginas: JSON.stringify(paginas), updatedAt: new Date() }).where(eq(capitulos.id, capituloId));
 }
 
 // ─── Comentários ─────────────────────────────────────────────────────────────
-export async function listComentarios(obraId: number) {
-  const db = await getDb();
-  if (!db) return [];
-  return db.select().from(comentarios).where(and(eq(comentarios.obraId, obraId), eq(comentarios.deleted, false))).orderBy(desc(comentarios.createdAt));
-}
-
 export async function createComentario(data: { obraId: number; autorId: number; content: string; }) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const result = await db.insert(comentarios).values(data);
-  return result[0];
+  const [row] = await db.insert(comentarios).values(data).returning();
+  return row;
 }
 
-export async function deleteComentario(id: number) {
+export async function listComentarios(obraId: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(comentarios).where(eq(comentarios.obraId, obraId)).orderBy(desc(comentarios.createdAt));
+}
+
+export async function deleteComentario(id: number, autorId: number) {
   const db = await getDb();
   if (!db) return;
-  await db.update(comentarios).set({ deleted: true }).where(eq(comentarios.id, id));
+  await db.update(comentarios).set({ deleted: true, updatedAt: new Date() }).where(and(eq(comentarios.id, id), eq(comentarios.autorId, autorId)));
 }
 
 // ─── Curtidas ────────────────────────────────────────────────────────────────
-export async function getCurtida(obraId: number, userId: number) {
+export async function toggleCurtida(userId: number, obraId: number) {
   const db = await getDb();
-  if (!db) return undefined;
-  const result = await db.select().from(curtidas).where(and(eq(curtidas.obraId, obraId), eq(curtidas.userId, userId))).limit(1);
-  return result[0];
-}
-
-export async function countCurtidas(obraId: number) {
-  const db = await getDb();
-  if (!db) return 0;
-  const result = await db.select({ count: sql<number>`count(*)` }).from(curtidas).where(eq(curtidas.obraId, obraId));
-  return result[0]?.count ?? 0;
-}
-
-export async function toggleCurtida(obraId: number, userId: number) {
-  const existing = await getCurtida(obraId, userId);
-  const db = await getDb();
-  if (!db) return false;
-  if (existing) { await db.delete(curtidas).where(and(eq(curtidas.obraId, obraId), eq(curtidas.userId, userId))); return false; }
-  else { await db.insert(curtidas).values({ obraId, userId }); return true; }
+  if (!db) return;
+  const existing = await db.select().from(curtidas).where(and(eq(curtidas.userId, userId), eq(curtidas.obraId, obraId))).limit(1);
+  if (existing[0]) { await db.delete(curtidas).where(and(eq(curtidas.userId, userId), eq(curtidas.obraId, obraId))); return false; }
+  else { await db.insert(curtidas).values({ userId, obraId }); return true; }
 }
 
 // ─── Favoritos ───────────────────────────────────────────────────────────────
-export async function listFavoritos(userId: number) {
-  const db = await getDb();
-  if (!db) return [];
-  return db.select().from(favoritos).where(eq(favoritos.userId, userId)).orderBy(desc(favoritos.createdAt));
-}
-
-export async function getFavorito(userId: number, obraId: number) {
-  const db = await getDb();
-  if (!db) return undefined;
-  const result = await db.select().from(favoritos).where(and(eq(favoritos.userId, userId), eq(favoritos.obraId, obraId))).limit(1);
-  return result[0];
-}
-
 export async function toggleFavorito(userId: number, obraId: number) {
-  const existing = await getFavorito(userId, obraId);
   const db = await getDb();
-  if (!db) return false;
-  if (existing) { await db.delete(favoritos).where(and(eq(favoritos.userId, userId), eq(favoritos.obraId, obraId))); return false; }
+  if (!db) return;
+  const existing = await db.select().from(favoritos).where(and(eq(favoritos.userId, userId), eq(favoritos.obraId, obraId))).limit(1);
+  if (existing[0]) { await db.delete(favoritos).where(and(eq(favoritos.userId, userId), eq(favoritos.obraId, obraId))); return false; }
   else { await db.insert(favoritos).values({ userId, obraId }); return true; }
 }
 
@@ -392,7 +347,16 @@ export async function getHistoricoLeitura(userId: number) {
 export async function upsertHistoricoLeitura(data: { userId: number; obraId: number; capituloId: number; progresso: number; }) {
   const db = await getDb();
   if (!db) return;
-  await db.insert(historicoLeitura).values(data).onDuplicateKeyUpdate({ set: { progresso: data.progresso } });
+    await db.insert(historicoLeitura)
+    .values(data)
+    .onConflictDoUpdate({
+      target: [historicoLeitura.userId, historicoLeitura.obraId],
+      set: {
+        capituloId: data.capituloId,
+        progresso: data.progresso,
+        updatedAt: new Date(),
+      },
+    });
 }
 
 // ─── Histórico ADM ───────────────────────────────────────────────────────────
@@ -441,7 +405,12 @@ export async function getPublicLink(key: string) {
 export async function setPublicLink(key: string, value: string) {
   const db = await getDb();
   if (!db) return;
-  await db.insert(publicLinks).values({ key, value }).onDuplicateKeyUpdate({ set: { value } });
+    await db.insert(publicLinks)
+    .values({ key, value })
+    .onConflictDoUpdate({
+      target: publicLinks.key,
+      set: { value },
+    });
 }
 
 // ─── Reports ─────────────────────────────────────────────────────────────────
@@ -461,43 +430,30 @@ export async function listReports(page = 1, limit = 30, resolved?: boolean) {
   return query.orderBy(desc(reports.createdAt)).limit(limit).offset((page - 1) * limit);
 }
 
-export async function resolveReport(reportId: number, resolved: boolean) {
+export async function resolveReport(reportId: number, adminId: number) {
   const db = await getDb();
   if (!db) return;
-  await db.update(reports).set({ resolvido: resolved }).where(eq(reports.id, reportId));
+  await db.update(reports).set({ resolvido: true, adminId, resolvidoEm: new Date() }).where(eq(reports.id, reportId));
 }
 
-// ─── Sessões ──────────────────────────────────────────────────────────────────
-
-const SESSAO_DIAS = 30;
-
-export async function criarSessao(openId: string, userId: number, ip?: string): Promise<string> {
-  const db = await getDb();
-  if (!db) throw new Error("DB unavailable");
-  const id = crypto.randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + SESSAO_DIAS * 24 * 60 * 60 * 1000);
-  await db.insert(sessoes).values({ id, userId, openId, expiresAt, ip: ip ?? null });
-  return id;
-}
-
-export async function getSessao(sessionId: string) {
-  const db = await getDb();
-  if (!db) return null;
-  const result = await db.select().from(sessoes).where(eq(sessoes.id, sessionId)).limit(1);
-  const sessao = result[0];
-  if (!sessao) return null;
-  // Verifica expiração
-  if (sessao.expiresAt < new Date()) {
-    await db.delete(sessoes).where(eq(sessoes.id, sessionId));
-    return null;
-  }
-  return sessao;
-}
-
-export async function deletarSessao(sessionId: string) {
+// ─── Sessoes ─────────────────────────────────────────────────────────────────
+export async function criarSessao(data: { id: string; userId: number; openId: string; expiresAt: Date; ip?: string; }) {
   const db = await getDb();
   if (!db) return;
-  await db.delete(sessoes).where(eq(sessoes.id, sessionId));
+  await db.insert(sessoes).values(data);
+}
+
+export async function getSessao(id: string) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(sessoes).where(eq(sessoes.id, id)).limit(1);
+  return result[0];
+}
+
+export async function deletarSessao(id: string) {
+  const db = await getDb();
+  if (!db) return;
+  await db.delete(sessoes).where(eq(sessoes.id, id));
 }
 
 export async function deletarSessoesUsuario(userId: number) {
