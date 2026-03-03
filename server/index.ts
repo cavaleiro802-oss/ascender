@@ -53,17 +53,16 @@ const ALLOWED_ORIGINS = isProd
 // ─── Helmet — headers de segurança ───────────────────────────────────────────
 app.use(helmet({
   crossOriginEmbedderPolicy: false,
-  contentSecurityPolicy: isProd ? {
-  directives: {
-    defaultSrc: ["'self'"],
-    connectSrc: ["'self'", SITE_URL, "https://accounts.google.com", "https://oauth2.googleapis.com"].filter(Boolean),
-    imgSrc: ["'self'", "data:", "https://*.r2.dev", "https://lh3.googleusercontent.com"],
-    scriptSrc: ["'self'", "'unsafe-inline'", "https://accounts.google.com", "https://apis.google.com"],
-    scriptSrcElem: ["'self'", "'unsafe-inline'", "https://accounts.google.com", "https://apis.google.com"],
-    frameSrc: ["'self'", "https://accounts.google.com"],
-    styleSrc: ["'self'", "'unsafe-inline'"],
-  },
-} : false,
+ contentSecurityPolicy: isProd ? {
+    directives: {
+      defaultSrc: ["'self'"],
+      // ✅ SITE_URL e domínio do backend na connectSrc
+      connectSrc: ["'self'", SITE_URL, "https://accounts.google.com"].filter(Boolean),
+      imgSrc: ["'self'", "data:", "https://*.r2.dev", "lh3.googleusercontent.com"],
+      scriptSrc: ["'self'", "https://accounts.google.com"],
+      frameSrc: ["https://accounts.google.com"],
+    },
+  } : false,
 }));
 
 // ─── CORS ────────────────────────────────────────────────────────────────────
