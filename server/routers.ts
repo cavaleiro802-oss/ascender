@@ -58,10 +58,10 @@ import {
 
 // ─── Helpers de permissão ─────────────────────────────────────────────────────
 const ROLE_LEVEL: Record<string, number> = {
-  usuario: 0, tradutor_aprendiz: 1, tradutor_oficial: 2, admin: 3, admin_supremo: 4,
+  usuario: 0, tradutor_aprendiz: 1, tradutor_oficial: 2, criador: 3, admin_senhor: 4, admin_supremo: 5,
 };
 function roleLevel(role: string) { return ROLE_LEVEL[role] ?? 0; }
-function isAdmin(role: string) { return roleLevel(role) >= 3; }
+function isAdmin(role: string) { return roleLevel(role) >= 4; }
 function isSupremeAdmin(role: string) { return role === "admin_supremo"; }
 function isTranslatorOrAbove(role: string) { return roleLevel(role) >= 1; }
 function isOfficialOrAbove(role: string) { return roleLevel(role) >= 2; }
@@ -80,8 +80,7 @@ const obrasRouter = router({
       search: z.string().max(100).optional(),
       sort: z.enum(["hot", "recent", "most"]).optional(),
       page: z.number().int().min(1).optional(),
-      limit: z.number().int().min(1).max(20).optional(),
-                                      
+      limit: z.number().int().min(1).max(200).optional(),
     }))
     .query(({ input }) => listObras({ ...input, status: "aprovada" })),
 
@@ -344,7 +343,7 @@ const adminRouter = router({
     }),
 
   setRole: protectedProcedure
-    .input(z.object({ userId: z.number(), role: z.enum(["usuario", "tradutor_aprendiz", "tradutor_oficial", "admin", "admin_supremo"]) }))
+    .input(z.object({ userId: z.number(), role: z.enum(["usuario", "tradutor_aprendiz", "tradutor_oficial", "criador", "admin_senhor", "admin_supremo"]) }))
     .mutation(async ({ ctx, input }) => {
       if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
       // ✅ Não pode promover a si mesmo
@@ -467,3 +466,4 @@ export const appRouter = router({
 });
 
 export type AppRouter = typeof appRouter;
+
