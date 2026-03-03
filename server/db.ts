@@ -20,8 +20,11 @@ import {
   reports,
   users,
 } from "../drizzle/schema";
+import * as schema from "../drizzle/schema"; // CORRIGIDO: import do schema completo
 
-let _db: ReturnType<typeof drizzle> | null = null;
+// CORRIGIDO: tipo correto para drizzle com node-postgres + schema
+type Db = ReturnType<typeof drizzle<typeof schema>>;
+let _db: Db | null = null;
 
 export async function getDb() {
   if (!_db) {
@@ -29,7 +32,7 @@ export async function getDb() {
       const connectionString = process.env.DATABASE_URL;
       if (connectionString) {
         const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
-        _db = drizzle(pool);
+        _db = drizzle(pool, { schema }); // CORRIGIDO: passa schema
         console.log("[Database] Conectado via PostgreSQL ✅");
       } else {
         console.warn("[Database] DATABASE_URL não definida ⚠️");
@@ -59,7 +62,6 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   else if (user.openId === (process.env.OWNER_OPEN_ID ?? "")) { values.role = "admin_supremo"; updateSet.role = "admin_supremo"; }
   if (!values.lastSignedIn) values.lastSignedIn = new Date();
   if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
-  // onDuplicateKeyUpdate era MySQL — trocado para onConflictDoUpdate (PostgreSQL)
   await db.insert(users).values(values).onConflictDoUpdate({ target: users.openId, set: updateSet as any });
 }
 
@@ -155,7 +157,6 @@ export async function avaliarPedidoCargo(data: {
     const novoRole = pedido[0].tipo === "quero_aprender" ? "tradutor_aprendiz" : "tradutor_oficial";
     await db.update(users).set({ role: novoRole, updatedAt: new Date() }).where(eq(users.id, pedido[0].userId));
 
-    // Busca link "tradutorPraCima" — só admin_supremo pode alterar esse link
     const tradutorLink = await getPublicLink("tradutorPraCima");
     const msgLink = tradutorLink ? `\n\nAcesse nosso grupo: ${tradutorLink.value}` : "";
     await criarNotificacao({
@@ -230,28 +231,12 @@ export async function getObraById(id: number) {
   return result[0];
 }
 
-export async function createObra(data:
-{ 
- title: string;
-synopsis?: string;
-genres?: string[];
-coverUrl?: string;
-authorId: number;
-originalAuthor?: string; 
-status: "em_espera" | "aprovada";
-}) { 
+export async function createObra(data: { title: string; synopsis?: string; genres?: string[]; coverUrl?: string; authorId: number; originalAuthor?: string; status: "em_espera" | "aprovada"; }) {
   const db = await getDb();
-  if (!db) throw new Error("DB 
-unavailable");
-  
-  const inserted = await db
-    .insert(obras) 
-    .values({ 
-    ...data,
-      genres: data.genres ? 
-  JSON.stringify(data.genres) : null,
-    })
-  .returning(); return inserted[0] ?? null;
+  if (!db) throw new Error("DB unavailable");
+  // CORRIGIDO: .returning() para PostgreSQL retornar o registro inserido como array
+  const result = await db.insert(obras).values({ ...data, genres: data.genres ? JSON.stringify(data.genres) : null }).returning();
+  return result[0];
 }
 
 export async function updateObraStatus(obraId: number, status: "em_espera" | "aprovada" | "rejeitada") {
@@ -285,11 +270,6 @@ export async function listPendingObras() {
 }
 
 // ─── Transferência de Obra ────────────────────────────────────────────────────
-// Regras:
-//   - Só um request "pendente" por obra de cada vez (verificado antes de inserir).
-//   - Se obra.updatedAt > request.createdAt => cancelar automaticamente.
-//   - Apenas admin_supremo pode chamar decidirTransferObra() — validar na route.
-
 export async function solicitarTransferObra(data: {
   obraId: number;
   requesterId: number;
@@ -370,8 +350,6 @@ export async function listTransferRequests(obraId?: number, status?: "pendente" 
 }
 
 // ─── Feature Flags ────────────────────────────────────────────────────────────
-// Seeds: "xp_enabled" | "ranking_enabled" | "monetizacao_enabled" (todos enabled=false)
-
 export async function getFeatureFlag(key: string): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
@@ -411,8 +389,9 @@ export async function getCapituloById(id: number) {
 export async function createCapitulo(data: { obraId: number; authorId: number; numero: number; title?: string; paginas?: string; paginasKeys?: string; status: "aguardando" | "aprovado"; }) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const result = await db.insert(capitulos).values(data);
- return result?.[0] as any;
+  // CORRIGIDO: .returning() para PostgreSQL retornar o registro inserido como array
+  const result = await db.insert(capitulos).values(data).returning();
+  return result[0];
 }
 
 export async function countCapitulosAguardando(authorId: number) {
@@ -451,8 +430,9 @@ export async function listComentarios(obraId: number) {
 export async function createComentario(data: { obraId: number; autorId: number; content: string; }) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const result = await db.insert(comentarios).values(data);
-return result?.[0] as any;
+  // CORRIGIDO: .returning() para PostgreSQL retornar o registro inserido como array
+  const result = await db.insert(comentarios).values(data).returning();
+  return result[0];
 }
 
 export async function deleteComentario(id: number) {
@@ -516,7 +496,6 @@ export async function getHistoricoLeitura(userId: number) {
 export async function upsertHistoricoLeitura(data: { userId: number; obraId: number; capituloId: number; progresso: number; }) {
   const db = await getDb();
   if (!db) return;
-  // unique(userId, capituloId) definido no schema — onConflictDoUpdate correto para PostgreSQL
   await db.insert(historicoLeitura).values(data)
     .onConflictDoUpdate({
       target: [historicoLeitura.userId, historicoLeitura.capituloId],
@@ -560,9 +539,6 @@ export async function getPlatformStats() {
 }
 
 // ─── Links Públicos ──────────────────────────────────────────────────────────
-// Escrita bloqueada p/ todos exceto admin_supremo — validar na route.
-// Seed esperado: key="tradutorPraCima"
-
 export async function getPublicLink(key: string) {
   const db = await getDb();
   if (!db) return undefined;
@@ -643,4 +619,3 @@ export async function limparSessoesExpiradas() {
   if (!db) return;
   await db.delete(sessoes).where(lt(sessoes.expiresAt, new Date()));
 }
-
