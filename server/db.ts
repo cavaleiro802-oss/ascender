@@ -242,7 +242,7 @@ status: "em_espera" | "aprovada";
 }) { 
   const db = await getDb();
   if (!db) throw new Error("DB 
-indisponível");
+unavailable");
   
   const inserted = await db
     .insert(obras) 
