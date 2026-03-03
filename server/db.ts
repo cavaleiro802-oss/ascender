@@ -230,11 +230,28 @@ export async function getObraById(id: number) {
   return result[0];
 }
 
-export async function createObra(data: { title: string; synopsis?: string; genres?: string[]; coverUrl?: string; authorId: number; originalAuthor?: string; status: "em_espera" | "aprovada"; }) {
+export async function createObra(data:
+{ 
+ title: string;
+synopsis?: string;
+genres?: string[];
+coverUrl?: string;
+authorId: number;
+originalAuthor?: string; 
+status: "em_espera" | "aprovada";
+}) { 
   const db = await getDb();
-  if (!db) throw new Error("DB unavailable");
-  const result = await db.insert(obras).values({ ...data, genres: data.genres ? JSON.stringify(data.genres) : null });
- return result?.[0] as any;
+  if (!db) throw new Error("DB 
+indisponível");
+  
+  const inserted = await db
+    .insert(obras) 
+    .values({ 
+    ...data,
+      genres: data.genres ? 
+  JSON.stringify(data.genres) : null,
+    })
+  .returning(); return inserted[0] ?? null;
 }
 
 export async function updateObraStatus(obraId: number, status: "em_espera" | "aprovada" | "rejeitada") {
