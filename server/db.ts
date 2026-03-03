@@ -234,7 +234,7 @@ export async function createObra(data: { title: string; synopsis?: string; genre
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
   const result = await db.insert(obras).values({ ...data, genres: data.genres ? JSON.stringify(data.genres) : null });
-  return result[0];
+ return result?.[0] as any;
 }
 
 export async function updateObraStatus(obraId: number, status: "em_espera" | "aprovada" | "rejeitada") {
@@ -395,7 +395,7 @@ export async function createCapitulo(data: { obraId: number; authorId: number; n
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
   const result = await db.insert(capitulos).values(data);
-  return result[0];
+ return result?.[0] as any;
 }
 
 export async function countCapitulosAguardando(authorId: number) {
@@ -435,7 +435,7 @@ export async function createComentario(data: { obraId: number; autorId: number; 
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
   const result = await db.insert(comentarios).values(data);
-  return result[0];
+return result?.[0] as any;
 }
 
 export async function deleteComentario(id: number) {
