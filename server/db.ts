@@ -1,6 +1,7 @@
 import { and, desc, eq, like, sql, lt } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/mysql2";
-import crypto from "crypto"; // ✅ import no topo, não no meio do arquivo
+import { drizzle } from "drizzle-orm/node-postgres";
+import { Pool } from "pg";
+import crypto from "crypto";
 import {
   InsertUser,
   sessoes,
@@ -17,14 +18,28 @@ import {
   reports,
   users,
 } from "../drizzle/schema";
+
 let _db: ReturnType<typeof drizzle> | null = null;
 
 export async function getDb() {
-  if (!_db && process.env.DATABASE_URL) {
-    try { _db = drizzle(process.env.DATABASE_URL); }
-    catch (error) { console.warn("[Database] Failed to connect:", error); _db = null; }
+  if (!_db) {
+    try {
+      const connectionString = process.env.DATABASE_URL;
+      if (connectionString) {
+        const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });
+        _db = drizzle(pool);
+        console.log("[Database] Conectado via PostgreSQL ✅");
+      } else {
+        console.warn("[Database] DATABASE_URL não definida ⚠️");
+      }
+    } catch (error) {
+      console.warn("[Database] Failed to connect:", error);
+      _db = null;
+    }
   }
   return _db;
+}
+
 }
 
 // ─── Users ───────────────────────────────────────────────────────────────────
