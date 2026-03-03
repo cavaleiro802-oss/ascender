@@ -1,20 +1,31 @@
-import { existsSync, readdirSync } from "fs";
+import { existsSync } from "fs";
 import { execSync } from "child_process";
-import path from "path";
 
 console.log("\n========== DIAGNÓSTICO ASCENDER ==========\n");
 
 // 1. Variáveis de ambiente
-const vars = ["NODE_ENV", "DATABASE_URL", "GOOGLE_CLIENT_ID", "SESSION_SECRET", 
+const vars = ["NODE_ENV", "DATABASE_URL", "MYSQLHOST", "MYSQLPORT", "MYSQLUSER", 
+               "MYSQLPASSWORD", "MYSQLDATABASE", "GOOGLE_CLIENT_ID", "SESSION_SECRET", 
                "SITE_URL", "R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY",
                "R2_BUCKET_NAME", "R2_PUBLIC_URL", "R2_ACCOUNT_ID", "PORT"];
 console.log("── Variáveis de ambiente ──");
 for (const v of vars) {
   const val = process.env[v];
-  console.log(`${val ? "✅" : "❌"} ${v}: ${val ? (v.includes("SECRET") || v.includes("KEY") || v.includes("URL") ? "[definida]" : val) : "NÃO DEFINIDA"}`);
+  const ocultar = v.includes("SECRET") || v.includes("PASSWORD") || v.includes("KEY");
+  console.log(`${val ? "✅" : "❌"} ${v}: ${val ? (ocultar ? "[definida]" : val) : "NÃO DEFINIDA"}`);
 }
 
-// 2. Arquivos críticos
+// 2. Conexão MySQL
+console.log("\n── Conexão MySQL ──");
+if (process.env.MYSQLHOST && process.env.MYSQLUSER) {
+  console.log("✅ Usando variáveis separadas (MYSQLHOST, MYSQLUSER, etc.)");
+} else if (process.env.DATABASE_URL) {
+  console.log("⚠️  Usando DATABASE_URL (pode ter problema com root/IPv6)");
+} else {
+  console.log("❌ Nenhuma variável de banco definida!");
+}
+
+// 3. Arquivos críticos
 console.log("\n── Arquivos críticos ──");
 const files = [
   "package.json", "server/index.ts", "server/routers.ts", "server/db.ts",
@@ -24,13 +35,6 @@ const files = [
 for (const f of files) {
   console.log(`${existsSync(f) ? "✅" : "❌"} ${f}`);
 }
-
-// 3. Versões
-console.log("\n── Versões ──");
-try { console.log("Node:", process.version); } catch {}
-try { console.log("npm:", execSync("npm --version").toString().trim()); } catch {}
-try { console.log("tsx:", execSync("npx tsx --version 2>/dev/null").toString().trim()); } catch { console.log("tsx: não encontrado"); }
-try { console.log("vite:", execSync("npx vite --version 2>/dev/null").toString().trim()); } catch { console.log("vite: não encontrado"); }
 
 // 4. Conteúdo do dist
 console.log("\n── Conteúdo do dist/ ──");
