@@ -59,7 +59,8 @@ app.use(helmet({
       // ✅ SITE_URL e domínio do backend na connectSrc
       connectSrc: ["'self'", SITE_URL, "https://accounts.google.com"].filter(Boolean),
       imgSrc: ["'self'", "data:", "https://*.r2.dev", "lh3.googleusercontent.com"],
-      scriptSrc: ["'self'", "https://accounts.google.com"],
+      scriptSrc: ["'self'", "https://accounts.google.com", "https://apis.google.com"],
+      scriptSrcElem: ["'self'", "https://accounts.google.com", "https://apis.google.com"],
       frameSrc: ["https://accounts.google.com"],
     },
   } : false,
