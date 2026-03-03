@@ -13,6 +13,8 @@ import {
   historicoLeitura,
   notificacoes,
   obras,
+  obraTransferRequests,
+  featureFlags,
   pedidosCargo,
   publicLinks,
   reports,
@@ -57,12 +59,8 @@ export async function upsertUser(user: InsertUser): Promise<void> {
   else if (user.openId === (process.env.OWNER_OPEN_ID ?? "")) { values.role = "admin_supremo"; updateSet.role = "admin_supremo"; }
   if (!values.lastSignedIn) values.lastSignedIn = new Date();
   if (Object.keys(updateSet).length === 0) updateSet.lastSignedIn = new Date();
-    await db.insert(users)
-    .values(values)
-    .onConflictDoUpdate({
-      target: users.openId,
-      set: updateSet,
-    });
+  // onDuplicateKeyUpdate era MySQL — trocado para onConflictDoUpdate (PostgreSQL)
+  await db.insert(users).values(values).onConflictDoUpdate({ target: users.openId, set: updateSet as any });
 }
 
 export async function getUserByOpenId(openId: string) {
@@ -123,7 +121,6 @@ export async function updateUserProfile(userId: number, data: { displayName?: st
 export async function criarPedidoCargo(data: { userId: number; tipo: "quero_aprender" | "posso_ajudar"; mensagem?: string }) {
   const db = await getDb();
   if (!db) return;
-  // Atualiza timestamp do último pedido no usuário
   await db.update(users).set({ ultimoPedidoCargo: new Date() }).where(eq(users.id, data.userId));
   await db.insert(pedidosCargo).values({ ...data, status: "pendente" });
 }
@@ -154,22 +151,20 @@ export async function avaliarPedidoCargo(data: {
     avaliadoEm: new Date(),
   }).where(eq(pedidosCargo.id, data.pedidoId));
 
-  // Se aprovado, promove o cargo automaticamente
   if (data.status === "aprovado") {
     const novoRole = pedido[0].tipo === "quero_aprender" ? "tradutor_aprendiz" : "tradutor_oficial";
     await db.update(users).set({ role: novoRole, updatedAt: new Date() }).where(eq(users.id, pedido[0].userId));
 
-    // Notificação de aprovação + link do telegram
-    const telegramLink = await getPublicLink("telegram");
-    const msgTelegram = telegramLink ? `\n\nAcesse nosso grupo: ${telegramLink.value}` : "";
+    // Busca link "tradutorPraCima" — só admin_supremo pode alterar esse link
+    const tradutorLink = await getPublicLink("tradutorPraCima");
+    const msgLink = tradutorLink ? `\n\nAcesse nosso grupo: ${tradutorLink.value}` : "";
     await criarNotificacao({
       userId: pedido[0].userId,
       tipo: "cargo_aprovado",
       titulo: "🎉 Pedido aprovado! Bem-vindo à equipe!",
-      mensagem: `Seu pedido foi aprovado! Você agora é ${novoRole === "tradutor_aprendiz" ? "Tradutor Aprendiz" : "Tradutor Oficial"}.${msgTelegram}`,
+      mensagem: `Seu pedido foi aprovado! Você agora é ${novoRole === "tradutor_aprendiz" ? "Tradutor Aprendiz" : "Tradutor Oficial"}.${msgLink}`,
     });
   } else {
-    // Notificação de rejeição com prazo de 10 dias
     await criarNotificacao({
       userId: pedido[0].userId,
       tipo: "cargo_rejeitado",
@@ -238,11 +233,8 @@ export async function getObraById(id: number) {
 export async function createObra(data: { title: string; synopsis?: string; genres?: string[]; coverUrl?: string; authorId: number; originalAuthor?: string; status: "em_espera" | "aprovada"; }) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
-  const [row] = await db
-    .insert(obras)
-    .values({ ...data, genres: data.genres ? JSON.stringify(data.genres) : null })
-    .returning();
-  return row;
+  const result = await db.insert(obras).values({ ...data, genres: data.genres ? JSON.stringify(data.genres) : null });
+  return result[0];
 }
 
 export async function updateObraStatus(obraId: number, status: "em_espera" | "aprovada" | "rejeitada") {
@@ -263,15 +255,133 @@ export async function incrementObraViews(obraId: number) {
   await db.update(obras).set({ viewsTotal: sql`${obras.viewsTotal} + 1`, viewsWeek: sql`${obras.viewsWeek} + 1`, updatedAt: new Date() }).where(eq(obras.id, obraId));
 }
 
-// ─── Capítulos ───────────────────────────────────────────────────────────────
-export async function createCapitulo(data: { obraId: number; authorId: number; numero: number; title?: string; paginas?: string[]; }) {
+export async function resetWeeklyViews() {
   const db = await getDb();
-  if (!db) throw new Error("DB unavailable");
-  const [row] = await db
-    .insert(capitulos)
-    .values({ ...data, paginas: data.paginas ? JSON.stringify(data.paginas) : null })
-    .returning();
-  return row;
+  if (!db) return;
+  await db.update(obras).set({ viewsWeek: 0 });
+}
+
+export async function listPendingObras() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(obras).where(eq(obras.status, "em_espera")).orderBy(obras.createdAt);
+}
+
+// ─── Transferência de Obra ────────────────────────────────────────────────────
+// Regras:
+//   - Só um request "pendente" por obra de cada vez (verificado antes de inserir).
+//   - Se obra.updatedAt > request.createdAt => cancelar automaticamente.
+//   - Apenas admin_supremo pode chamar decidirTransferObra() — validar na route.
+
+export async function solicitarTransferObra(data: {
+  obraId: number;
+  requesterId: number;
+  novoAuthorId: number;
+  motivo?: string;
+}) {
+  const db = await getDb();
+  if (!db) return;
+
+  await cancelarTransferSeObraMudou(data.obraId);
+
+  const existente = await db.select().from(obraTransferRequests)
+    .where(and(eq(obraTransferRequests.obraId, data.obraId), eq(obraTransferRequests.status, "pendente")))
+    .limit(1);
+  if (existente[0]) throw new Error("Já existe um pedido de transferência pendente para esta obra.");
+
+  await db.insert(obraTransferRequests).values({ ...data, status: "pendente" });
+}
+
+export async function cancelarTransferSeObraMudou(obraId: number) {
+  const db = await getDb();
+  if (!db) return;
+  const obra = await getObraById(obraId);
+  if (!obra) return;
+
+  const pendentes = await db.select().from(obraTransferRequests)
+    .where(and(eq(obraTransferRequests.obraId, obraId), eq(obraTransferRequests.status, "pendente")));
+
+  for (const req of pendentes) {
+    if (obra.updatedAt > req.createdAt) {
+      await db.update(obraTransferRequests).set({
+        status: "rejeitado",
+        canceladoMotivo: "Obra foi modificada antes da decisão.",
+        decidedAt: new Date(),
+      }).where(eq(obraTransferRequests.id, req.id));
+    }
+  }
+}
+
+export async function decidirTransferObra(data: {
+  requestId: number;
+  decidedBy: number;
+  status: "aprovado" | "rejeitado";
+  canceladoMotivo?: string;
+}) {
+  const db = await getDb();
+  if (!db) return;
+
+  const req = await db.select().from(obraTransferRequests).where(eq(obraTransferRequests.id, data.requestId)).limit(1);
+  if (!req[0] || req[0].status !== "pendente") throw new Error("Request não encontrado ou já decidido.");
+
+  await cancelarTransferSeObraMudou(req[0].obraId);
+
+  const reqAtual = await db.select().from(obraTransferRequests).where(eq(obraTransferRequests.id, data.requestId)).limit(1);
+  if (!reqAtual[0] || reqAtual[0].status !== "pendente") throw new Error("Request cancelado automaticamente pois a obra foi modificada.");
+
+  await db.update(obraTransferRequests).set({
+    status: data.status,
+    decidedBy: data.decidedBy,
+    decidedAt: new Date(),
+    canceladoMotivo: data.canceladoMotivo ?? null,
+  }).where(eq(obraTransferRequests.id, data.requestId));
+
+  if (data.status === "aprovado") {
+    await updateObraAuthor(req[0].obraId, req[0].novoAuthorId);
+  }
+}
+
+export async function listTransferRequests(obraId?: number, status?: "pendente" | "aprovado" | "rejeitado") {
+  const db = await getDb();
+  if (!db) return [];
+  let query = db.select().from(obraTransferRequests).$dynamic();
+  const conds: any[] = [];
+  if (obraId) conds.push(eq(obraTransferRequests.obraId, obraId));
+  if (status) conds.push(eq(obraTransferRequests.status, status));
+  if (conds.length > 0) query = query.where(and(...conds));
+  return query.orderBy(desc(obraTransferRequests.createdAt)).limit(50);
+}
+
+// ─── Feature Flags ────────────────────────────────────────────────────────────
+// Seeds: "xp_enabled" | "ranking_enabled" | "monetizacao_enabled" (todos enabled=false)
+
+export async function getFeatureFlag(key: string): Promise<boolean> {
+  const db = await getDb();
+  if (!db) return false;
+  const result = await db.select().from(featureFlags).where(eq(featureFlags.key, key)).limit(1);
+  return result[0]?.enabled ?? false;
+}
+
+export async function setFeatureFlag(key: string, enabled: boolean) {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(featureFlags).values({ key, enabled, updatedAt: new Date() })
+    .onConflictDoUpdate({ target: featureFlags.key, set: { enabled, updatedAt: new Date() } });
+}
+
+export async function listFeatureFlags() {
+  const db = await getDb();
+  if (!db) return [];
+  return db.select().from(featureFlags).orderBy(featureFlags.key);
+}
+
+// ─── Capítulos ───────────────────────────────────────────────────────────────
+export async function listCapitulos(obraId: number, includeAll = false) {
+  const db = await getDb();
+  if (!db) return [];
+  const conds = [eq(capitulos.obraId, obraId)];
+  if (!includeAll) conds.push(eq(capitulos.status, "aprovado"));
+  return db.select().from(capitulos).where(and(...conds)).orderBy(capitulos.numero);
 }
 
 export async function getCapituloById(id: number) {
@@ -281,59 +391,101 @@ export async function getCapituloById(id: number) {
   return result[0];
 }
 
-export async function listCapitulos(obraId: number) {
+export async function createCapitulo(data: { obraId: number; authorId: number; numero: number; title?: string; paginas?: string; paginasKeys?: string; status: "aguardando" | "aprovado"; }) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const result = await db.insert(capitulos).values(data);
+  return result[0];
+}
+
+export async function countCapitulosAguardando(authorId: number) {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db.select({ count: sql<number>`count(*)` }).from(capitulos)
+    .where(and(eq(capitulos.authorId, authorId), eq(capitulos.status, "aguardando")));
+  return result[0]?.count ?? 0;
+}
+
+export async function updateCapituloStatus(capId: number, status: "aguardando" | "aprovado" | "rejeitado") {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(capitulos).set({ status, updatedAt: new Date() }).where(eq(capitulos.id, capId));
+}
+
+export async function incrementCapituloViews(capId: number) {
+  const db = await getDb();
+  if (!db) return;
+  await db.update(capitulos).set({ viewsTotal: sql`${capitulos.viewsTotal} + 1` }).where(eq(capitulos.id, capId));
+}
+
+export async function listPendingCapitulos() {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(capitulos).where(eq(capitulos.obraId, obraId)).orderBy(desc(capitulos.numero));
-}
-
-export async function updateCapituloStatus(capituloId: number, status: "aguardando" | "aprovado" | "rejeitado") {
-  const db = await getDb();
-  if (!db) return;
-  await db.update(capitulos).set({ status, updatedAt: new Date() }).where(eq(capitulos.id, capituloId));
-}
-
-export async function updateCapituloPages(capituloId: number, paginas: string[]) {
-  const db = await getDb();
-  if (!db) return;
-  await db.update(capitulos).set({ paginas: JSON.stringify(paginas), updatedAt: new Date() }).where(eq(capitulos.id, capituloId));
+  return db.select().from(capitulos).where(eq(capitulos.status, "aguardando")).orderBy(capitulos.createdAt);
 }
 
 // ─── Comentários ─────────────────────────────────────────────────────────────
-export async function createComentario(data: { obraId: number; autorId: number; content: string; }) {
-  const db = await getDb();
-  if (!db) throw new Error("DB unavailable");
-  const [row] = await db.insert(comentarios).values(data).returning();
-  return row;
-}
-
 export async function listComentarios(obraId: number) {
   const db = await getDb();
   if (!db) return [];
-  return db.select().from(comentarios).where(eq(comentarios.obraId, obraId)).orderBy(desc(comentarios.createdAt));
+  return db.select().from(comentarios).where(and(eq(comentarios.obraId, obraId), eq(comentarios.deleted, false))).orderBy(desc(comentarios.createdAt));
 }
 
-export async function deleteComentario(id: number, autorId: number) {
+export async function createComentario(data: { obraId: number; autorId: number; content: string; }) {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const result = await db.insert(comentarios).values(data);
+  return result[0];
+}
+
+export async function deleteComentario(id: number) {
   const db = await getDb();
   if (!db) return;
-  await db.update(comentarios).set({ deleted: true, updatedAt: new Date() }).where(and(eq(comentarios.id, id), eq(comentarios.autorId, autorId)));
+  await db.update(comentarios).set({ deleted: true }).where(eq(comentarios.id, id));
 }
 
 // ─── Curtidas ────────────────────────────────────────────────────────────────
-export async function toggleCurtida(userId: number, obraId: number) {
+export async function getCurtida(obraId: number, userId: number) {
   const db = await getDb();
-  if (!db) return;
-  const existing = await db.select().from(curtidas).where(and(eq(curtidas.userId, userId), eq(curtidas.obraId, obraId))).limit(1);
-  if (existing[0]) { await db.delete(curtidas).where(and(eq(curtidas.userId, userId), eq(curtidas.obraId, obraId))); return false; }
-  else { await db.insert(curtidas).values({ userId, obraId }); return true; }
+  if (!db) return undefined;
+  const result = await db.select().from(curtidas).where(and(eq(curtidas.obraId, obraId), eq(curtidas.userId, userId))).limit(1);
+  return result[0];
+}
+
+export async function countCurtidas(obraId: number) {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db.select({ count: sql<number>`count(*)` }).from(curtidas).where(eq(curtidas.obraId, obraId));
+  return result[0]?.count ?? 0;
+}
+
+export async function toggleCurtida(obraId: number, userId: number) {
+  const existing = await getCurtida(obraId, userId);
+  const db = await getDb();
+  if (!db) return false;
+  if (existing) { await db.delete(curtidas).where(and(eq(curtidas.obraId, obraId), eq(curtidas.userId, userId))); return false; }
+  else { await db.insert(curtidas).values({ obraId, userId }); return true; }
 }
 
 // ─── Favoritos ───────────────────────────────────────────────────────────────
-export async function toggleFavorito(userId: number, obraId: number) {
+export async function listFavoritos(userId: number) {
   const db = await getDb();
-  if (!db) return;
-  const existing = await db.select().from(favoritos).where(and(eq(favoritos.userId, userId), eq(favoritos.obraId, obraId))).limit(1);
-  if (existing[0]) { await db.delete(favoritos).where(and(eq(favoritos.userId, userId), eq(favoritos.obraId, obraId))); return false; }
+  if (!db) return [];
+  return db.select().from(favoritos).where(eq(favoritos.userId, userId)).orderBy(desc(favoritos.createdAt));
+}
+
+export async function getFavorito(userId: number, obraId: number) {
+  const db = await getDb();
+  if (!db) return undefined;
+  const result = await db.select().from(favoritos).where(and(eq(favoritos.userId, userId), eq(favoritos.obraId, obraId))).limit(1);
+  return result[0];
+}
+
+export async function toggleFavorito(userId: number, obraId: number) {
+  const existing = await getFavorito(userId, obraId);
+  const db = await getDb();
+  if (!db) return false;
+  if (existing) { await db.delete(favoritos).where(and(eq(favoritos.userId, userId), eq(favoritos.obraId, obraId))); return false; }
   else { await db.insert(favoritos).values({ userId, obraId }); return true; }
 }
 
@@ -347,15 +499,11 @@ export async function getHistoricoLeitura(userId: number) {
 export async function upsertHistoricoLeitura(data: { userId: number; obraId: number; capituloId: number; progresso: number; }) {
   const db = await getDb();
   if (!db) return;
-    await db.insert(historicoLeitura)
-    .values(data)
+  // unique(userId, capituloId) definido no schema — onConflictDoUpdate correto para PostgreSQL
+  await db.insert(historicoLeitura).values(data)
     .onConflictDoUpdate({
-      target: [historicoLeitura.userId, historicoLeitura.obraId],
-      set: {
-        capituloId: data.capituloId,
-        progresso: data.progresso,
-        updatedAt: new Date(),
-      },
+      target: [historicoLeitura.userId, historicoLeitura.capituloId],
+      set: { progresso: data.progresso, updatedAt: new Date() },
     });
 }
 
@@ -395,6 +543,9 @@ export async function getPlatformStats() {
 }
 
 // ─── Links Públicos ──────────────────────────────────────────────────────────
+// Escrita bloqueada p/ todos exceto admin_supremo — validar na route.
+// Seed esperado: key="tradutorPraCima"
+
 export async function getPublicLink(key: string) {
   const db = await getDb();
   if (!db) return undefined;
@@ -405,12 +556,8 @@ export async function getPublicLink(key: string) {
 export async function setPublicLink(key: string, value: string) {
   const db = await getDb();
   if (!db) return;
-    await db.insert(publicLinks)
-    .values({ key, value })
-    .onConflictDoUpdate({
-      target: publicLinks.key,
-      set: { value },
-    });
+  await db.insert(publicLinks).values({ key, value })
+    .onConflictDoUpdate({ target: publicLinks.key, set: { value, updatedAt: new Date() } });
 }
 
 // ─── Reports ─────────────────────────────────────────────────────────────────
@@ -430,30 +577,42 @@ export async function listReports(page = 1, limit = 30, resolved?: boolean) {
   return query.orderBy(desc(reports.createdAt)).limit(limit).offset((page - 1) * limit);
 }
 
-export async function resolveReport(reportId: number, adminId: number) {
+export async function resolveReport(reportId: number, resolved: boolean) {
   const db = await getDb();
   if (!db) return;
-  await db.update(reports).set({ resolvido: true, adminId, resolvidoEm: new Date() }).where(eq(reports.id, reportId));
+  await db.update(reports).set({ resolvido: resolved }).where(eq(reports.id, reportId));
 }
 
-// ─── Sessoes ─────────────────────────────────────────────────────────────────
-export async function criarSessao(data: { id: string; userId: number; openId: string; expiresAt: Date; ip?: string; }) {
+// ─── Sessões ──────────────────────────────────────────────────────────────────
+
+const SESSAO_DIAS = 30;
+
+export async function criarSessao(openId: string, userId: number, ip?: string): Promise<string> {
+  const db = await getDb();
+  if (!db) throw new Error("DB unavailable");
+  const id = crypto.randomBytes(32).toString("hex");
+  const expiresAt = new Date(Date.now() + SESSAO_DIAS * 24 * 60 * 60 * 1000);
+  await db.insert(sessoes).values({ id, userId, openId, expiresAt, ip: ip ?? null });
+  return id;
+}
+
+export async function getSessao(sessionId: string) {
+  const db = await getDb();
+  if (!db) return null;
+  const result = await db.select().from(sessoes).where(eq(sessoes.id, sessionId)).limit(1);
+  const sessao = result[0];
+  if (!sessao) return null;
+  if (sessao.expiresAt < new Date()) {
+    await db.delete(sessoes).where(eq(sessoes.id, sessionId));
+    return null;
+  }
+  return sessao;
+}
+
+export async function deletarSessao(sessionId: string) {
   const db = await getDb();
   if (!db) return;
-  await db.insert(sessoes).values(data);
-}
-
-export async function getSessao(id: string) {
-  const db = await getDb();
-  if (!db) return undefined;
-  const result = await db.select().from(sessoes).where(eq(sessoes.id, id)).limit(1);
-  return result[0];
-}
-
-export async function deletarSessao(id: string) {
-  const db = await getDb();
-  if (!db) return;
-  await db.delete(sessoes).where(eq(sessoes.id, id));
+  await db.delete(sessoes).where(eq(sessoes.id, sessionId));
 }
 
 export async function deletarSessoesUsuario(userId: number) {
@@ -462,9 +621,9 @@ export async function deletarSessoesUsuario(userId: number) {
   await db.delete(sessoes).where(eq(sessoes.userId, userId));
 }
 
-// Limpa sessões expiradas — chamar periodicamente
 export async function limparSessoesExpiradas() {
   const db = await getDb();
   if (!db) return;
   await db.delete(sessoes).where(lt(sessoes.expiresAt, new Date()));
 }
+
