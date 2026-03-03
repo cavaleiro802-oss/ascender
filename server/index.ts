@@ -19,7 +19,6 @@ if (isProd) {
   const obrigatorias = [
     ["GOOGLE_CLIENT_ID", "Login Google não vai funcionar"],
     ["SITE_URL", "CORS vai bloquear todas as requisições"],
-    ["DATABASE_URL", "Banco de dados inacessível"],
     ["SESSION_SECRET", "Sessões inseguras"],
   ];
   let temErro = false;
@@ -133,7 +132,7 @@ app.use((err: any, _req: any, res: any, _next: any) => {
 
 app.listen(PORT, "0.0.0.0", () => {
   console.log(`✅ ASCENDER rodando na porta ${PORT} (${isProd ? "produção" : "desenvolvimento"})`);
-  console.log(`   Banco:  ${process.env.DATABASE_URL ? "✅" : "⚠️  não definido"}`);
+  console.log(`   Banco:  ${process.env.DATABASE_URL || process.env.MYSQLHOST ? "✅" : "⚠️  não definido"}`);
   console.log(`   R2:     ${process.env.R2_ENDPOINT ? "✅" : "⚠️  não configurado"}`);
   console.log(`   Google: ${process.env.GOOGLE_CLIENT_ID ? "✅" : "⚠️  não definido"}`);
 
