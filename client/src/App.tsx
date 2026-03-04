@@ -10,12 +10,14 @@ import AdminPage from "@/pages/AdminPage";
 import PerfilPage from "@/pages/PerfilPage";
 import NotFound from "@/pages/NotFound";
 import Footer from "@/components/Footer";
+import LoginPage from "@/pages/LoginPage";
 
 export default function App() {
   return (
     <>
       <Switch>
         <Route path="/" component={Home} />
+        <Route path="/login" component={LoginPage} />
         <Route path="/obra/:id" component={ObraPage} />
         <Route path="/obra/:obraId/capitulo/:capId" component={CapituloPage} />
         <Route path="/nova-obra" component={NovaObraPage} />
