@@ -57,30 +57,18 @@ export default function Topbar() {
 
           {/* Nav */}
           <nav className="hidden md:flex items-center gap-1">
-<Link href="/">
-  <Button
-    variant="ghost"
-    size="sm"
-    className={`text-white/70 hover:text-white hover:bg-white/5 ${location === "/" ? "text-white bg-white/5" : ""}`}
-  >
-    <BookOpen className="w-4 h-4 mr-1.5" />
-    Catálogo
-  </Button>
-</Link>
-           
-          
-{isAuthenticated && (
-  <Link href="/biblioteca">
-    <Button
-      variant="ghost"
-      size="sm"
-      className={`text-white/70 hover:text-white hover:bg-white/5 ${location === "/biblioteca" ? "text-white bg-white/5" : ""}`}
-    >
-      <Library className="w-4 h-4 mr-1.5" />
-      Biblioteca
-    </Button>
-  </Link>
-)}
+            <Link href="/">
+              <Button variant="ghost" size="sm" className={text-white/70 hover:text-white hover:bg-white/5 ${location === "/" ? "text-white bg-white/5" : ""}}>
+                <BookOpen className="w-4 h-4 mr-1.5" />Catálogo
+              </Button>
+            </Link>
+            {isAuthenticated && (
+              <Link href="/biblioteca">
+                <Button variant="ghost" size="sm" className={text-white/70 hover:text-white hover:bg-white/5 ${location === "/biblioteca" ? "text-white bg-white/5" : ""}}>
+                  <Library className="w-4 h-4 mr-1.5" />Biblioteca
+                </Button>
+              </Link>
+            )}
             {isTranslator && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -101,7 +89,7 @@ export default function Topbar() {
                   ) : (
                     minhasObras.map((obra) => (
                       <DropdownMenuItem key={obra.id} className="cursor-pointer hover:bg-white/5 flex-col items-start gap-0"
-                        onClick={() => navigate(`/obra/${obra.id}/novo-capitulo`)}>
+                        onClick={() => navigate(/obra/${obra.id}/novo-capitulo)}>
                         <span className="text-sm text-white/90 truncate w-full">{obra.title}</span>
                         <span className="text-xs text-muted-foreground">
                           {obra.status === "aprovada" ? "✅ Aprovada" : obra.status === "em_espera" ? "⏳ Pendente" : "❌ Rejeitada"}
