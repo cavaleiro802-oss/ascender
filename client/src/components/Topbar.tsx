@@ -204,7 +204,6 @@ export default function Topbar() {
           ) : (
           <GoogleLoginButton />
           )}
-            )}
           </div>
         </div>
       </header>
