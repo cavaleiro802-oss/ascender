@@ -137,7 +137,7 @@ export default function Topbar() {
                           e.preventDefault(); e.stopPropagation();
                           navigator.clipboard.writeText(String(user?.id ?? ""));
                           const el = e.currentTarget.querySelector("span");
-                          if (el) { el.textContent = "Copiado!"; setTimeout(() => { el.textContent = ID: #${user?.id}; }, 1500); }
+                          if (el) { el.textContent = "Copiado!"; setTimeout(() => { el.textContent = `ID: #${user?.id}`; }, 1500); }
                         }}>
                         <Copy className="w-3 h-3 group-hover:text-primary" /><span>ID: #{user?.id}</span>
                       </button>
