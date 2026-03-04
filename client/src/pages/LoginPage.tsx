@@ -36,17 +36,3 @@ return (
 
 );
 }
-Agora vai no App.tsx e adiciona:
-import LoginPage from "@/pages/LoginPage";
-
-// dentro do Switch:
-<Route path="/login" component={LoginPage} />
-E na Topbar.tsx troca o <GoogleLoginButton /> por:
-import { LogIn } from "lucide-react";
-import { useLocation } from "wouter";
-
-// no botão:
-<Button size="sm" className="bg-primary hover:bg-primary/90 text-white font-semibold"
-onClick={() => navigate("/login")}>
-<LogIn className="w-4 h-4 mr-1.5" />Entrar
-</Button>
