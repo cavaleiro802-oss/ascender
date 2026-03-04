@@ -109,7 +109,7 @@ export default function Topbar() {
           <div className="flex items-center gap-2">
             {isAuthenticated ? (
               <>
-                {roleInfo && <span className={asc-badge ${roleInfo.cls} hidden sm:inline-flex}>{roleInfo.label}</span>}
+                {roleInfo && <span className={`asc-badge ${roleInfo.cls} hidden sm:inline-flex`}>{roleInfo.label}</span>}
 
                 <Button variant="ghost" size="icon"
                   className="relative rounded-full text-white/70 hover:text-white hover:bg-white/5"
