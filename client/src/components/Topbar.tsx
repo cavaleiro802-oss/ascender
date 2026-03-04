@@ -11,6 +11,7 @@ import {
 } from "./ui/dropdown-menu";
 import PedidoCargoModal from "./PedidoCargoModal";
 import NotificacoesPanel from "./NotificacoesPanel";
+import GoogleLoginButton from "./GoogleLoginButton";
 
 const ROLE_LABELS: Record<string, { label: string; cls: string }> = {
   usuario: { label: "Usuário", cls: "asc-badge-blue" },
@@ -199,10 +200,6 @@ export default function Topbar() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </>
-            ) : (
-              import GoogleLoginButton from "./GoogleLoginButton";
-
-           // ...
 
           ) : (
           <GoogleLoginButton />
