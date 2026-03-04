@@ -169,7 +169,7 @@ export default function Topbar() {
                             </div>
                             {minhasObras.map((obra) => (
                               <DropdownMenuItem key={obra.id} className="cursor-pointer flex-col items-start gap-0 pl-5"
-                                onClick={() => navigate(/obra/${obra.id}/novo-capitulo)}>
+                                onClick={() => navigate(`/obra/${obra.id}/novo-capitulo`)}>
                                 <span className="text-sm text-white/90 truncate w-full">{obra.title}</span>
                                 <span className="text-xs text-muted-foreground">
                                   {obra.status === "aprovada" ? "✅ Aprovada" : obra.status === "em_espera" ? "⏳ Pendente" : "❌ Rejeitada"}
