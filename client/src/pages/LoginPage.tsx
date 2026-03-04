@@ -35,12 +35,16 @@ export default function LoginPage() {
   useEffect(() => {  
     if (!ready || initializedRef.current || !btnRef.current) return;  
     initializedRef.current = true;  
- window.google.accounts.id.initialize({  
-  client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,  
-  callback: async (response: { credential?: string }) => {  
-    if (!response?.credential) return;  
-    await loginWithGoogle(response.credential);  
-    navigate("/");  
+window.google.accounts.id.initialize({
+  client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,
+  callback: async (response: { credential?: string }) => {
+    if (!response?.credential) return;
+    await loginWithGoogle(response.credential);
+    navigate("/");
+  },
+  ux_mode: "redirect",
+  redirect_uri: "https://ascender-production.up.railway.app/login",
+});
   },  
   ux_mode: "popup",  
   auto_select: false,  
