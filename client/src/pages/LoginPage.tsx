@@ -45,11 +45,7 @@ window.google.accounts.id.initialize({
   ux_mode: "redirect",
   redirect_uri: "https://ascender-production.up.railway.app/login",
 });
-  },  
-  ux_mode: "popup",  
-  auto_select: false,  
-});  
-  
+ 
 window.google.accounts.id.renderButton(btnRef.current, {  
   theme: "filled_black",  
   size: "large",  
