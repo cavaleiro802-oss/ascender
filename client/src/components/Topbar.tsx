@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { Bell, BookOpen, ChevronDown, Copy, Library, LogOut, Plus, Shield, User } from "lucide-react";
+import { Bell, BookOpen, ChevronDown, Copy, Library, LogIn, LogOut, Plus, Shield, User } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "./ui/button";
@@ -10,7 +10,6 @@ import {
 } from "./ui/dropdown-menu";
 import PedidoCargoModal from "./PedidoCargoModal";
 import NotificacoesPanel from "./NotificacoesPanel";
-import GoogleLoginButton from "./GoogleLoginButton";
 
 const ROLE_LABELS: Record<string, { label: string; cls: string }> = {
   usuario: { label: "Usuário", cls: "asc-badge-blue" },
@@ -42,7 +41,6 @@ export default function Topbar() {
       <header className="asc-topbar sticky top-0 z-50 w-full">
         <div className="container flex h-16 items-center justify-between">
 
-          {/* Brand */}
           <Link href="/" className="flex items-center gap-2.5 select-none">
             <span className="asc-brand-mark">
               <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
@@ -55,7 +53,6 @@ export default function Topbar() {
             <span className="font-black text-lg tracking-widest uppercase text-white">ASCENDER</span>
           </Link>
 
-          {/* Nav */}
           <nav className="hidden md:flex items-center gap-1">
             <Link href="/">
               <Button variant="ghost" size="sm" className={text-white/70 hover:text-white hover:bg-white/5 ${location === "/" ? "text-white bg-white/5" : ""}}>
@@ -109,7 +106,6 @@ export default function Topbar() {
             )}
           </nav>
 
-          {/* Right */}
           <div className="flex items-center gap-2">
             {isAuthenticated ? (
               <>
@@ -197,7 +193,10 @@ export default function Topbar() {
                 </DropdownMenu>
               </>
             ) : (
-              <GoogleLoginButton />
+              <Button size="sm" className="bg-primary hover:bg-primary/90 text-white font-semibold"
+                onClick={() => navigate("/login")}>
+                <LogIn className="w-4 h-4 mr-1.5" />Entrar
+              </Button>
             )}
           </div>
 
