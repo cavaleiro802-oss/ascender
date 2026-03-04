@@ -99,7 +99,7 @@ export default function Topbar() {
             )}
             {isAdmin && (
               <Link href="/admin">
-                <Button variant="ghost" size="sm" className={text-white/70 hover:text-white hover:bg-white/5 ${location.startsWith("/admin") ? "text-white bg-white/5" : ""}}>
+                <Button variant="ghost" size="sm" className={`text-white/70 hover:text-white hover:bg-white/5 ${location.startsWith("/admin") ? "text-white bg-white/5" : ""}`}>
                   <Shield className="w-4 h-4 mr-1.5" />Admin
                 </Button>
               </Link>
