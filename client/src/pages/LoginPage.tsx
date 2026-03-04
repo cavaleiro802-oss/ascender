@@ -35,22 +35,23 @@ export default function LoginPage() {
   useEffect(() => {  
     if (!ready || initializedRef.current || !btnRef.current) return;  
     initializedRef.current = true;  
+ window.google.accounts.id.initialize({  
+  client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,  
+  callback: async (response: { credential?: string }) => {  
+    if (!response?.credential) return;  
+    await loginWithGoogle(response.credential);  
+    navigate("/");  
+  },  
+  ux_mode: "popup",  
+  auto_select: false,  
+});  
   
-    window.google.accounts.id.initialize({  
-      client_id: import.meta.env.VITE_GOOGLE_CLIENT_ID,  
-      callback: async (response: { credential?: string }) => {  
-        if (!response?.credential) return;  
-        await loginWithGoogle(response.credential);  
-        navigate("/");  
-      },  
-    });  
-  
-    window.google.accounts.id.renderButton(btnRef.current, {  
-      theme: "filled_black",  
-      size: "large",  
-      text: "signin_with",  
-      shape: "pill",  
-    });  
+window.google.accounts.id.renderButton(btnRef.current, {  
+  theme: "filled_black",  
+  size: "large",  
+  text: "signin_with",  
+  shape: "pill",  
+});
   }, [ready]);  
   
   return (  
