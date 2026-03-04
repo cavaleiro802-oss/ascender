@@ -1,7 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
-import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
-import { Bell, BookOpen, ChevronDown, Copy, Library, LogIn, LogOut, Plus, Shield, User } from "lucide-react";
+import { Bell, BookOpen, ChevronDown, Copy, Library, LogOut, Plus, Shield, User } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "./ui/button";
@@ -17,7 +16,7 @@ const ROLE_LABELS: Record<string, { label: string; cls: string }> = {
   usuario: { label: "Usuário", cls: "asc-badge-blue" },
   tradutor_aprendiz: { label: "Trad. Aprendiz", cls: "asc-badge-yellow" },
   tradutor_oficial: { label: "Trad. Oficial", cls: "asc-badge-green" },
-  admin: { label: "Admin", cls: "asc-badge-red" },
+  admin_senhor: { label: "Admin", cls: "asc-badge-red" },
   admin_supremo: { label: "Admin Supremo", cls: "asc-badge-purple" },
 };
 
@@ -27,7 +26,7 @@ export default function Topbar() {
   const [showPedidoModal, setShowPedidoModal] = useState(false);
   const [showNotificacoes, setShowNotificacoes] = useState(false);
 
-  const isAdmin = user?.role === "admin" || user?.role === "admin_supremo";
+  const isAdmin = user?.role === "admin_senhor" || user?.role === "admin_supremo";
   const isTranslator = user?.role === "tradutor_aprendiz" || user?.role === "tradutor_oficial" || isAdmin;
   const isUsuarioComum = user?.role === "usuario";
   const roleInfo = user?.role ? ROLE_LABELS[user.role] : null;
@@ -42,6 +41,7 @@ export default function Topbar() {
     <>
       <header className="asc-topbar sticky top-0 z-50 w-full">
         <div className="container flex h-16 items-center justify-between">
+
           {/* Brand */}
           <Link href="/" className="flex items-center gap-2.5 select-none">
             <span className="asc-brand-mark">
@@ -55,16 +55,16 @@ export default function Topbar() {
             <span className="font-black text-lg tracking-widest uppercase text-white">ASCENDER</span>
           </Link>
 
-          {/* Nav (desktop) */}
+          {/* Nav */}
           <nav className="hidden md:flex items-center gap-1">
             <Link href="/">
-              <Button variant="ghost" size="sm" className={`text-white/70 hover:text-white hover:bg-white/5 ${location === "/" ? "text-white bg-white/5" : ""}`}>
+              <Button variant="ghost" size="sm" className={text-white/70 hover:text-white hover:bg-white/5 ${location === "/" ? "text-white bg-white/5" : ""}}>
                 <BookOpen className="w-4 h-4 mr-1.5" />Catálogo
               </Button>
             </Link>
             {isAuthenticated && (
               <Link href="/biblioteca">
-                <Button variant="ghost" size="sm" className={`text-white/70 hover:text-white hover:bg-white/5 ${location === "/biblioteca" ? "text-white bg-white/5" : ""}`}>
+                <Button variant="ghost" size="sm" className={text-white/70 hover:text-white hover:bg-white/5 ${location === "/biblioteca" ? "text-white bg-white/5" : ""}}>
                   <Library className="w-4 h-4 mr-1.5" />Biblioteca
                 </Button>
               </Link>
@@ -89,7 +89,7 @@ export default function Topbar() {
                   ) : (
                     minhasObras.map((obra) => (
                       <DropdownMenuItem key={obra.id} className="cursor-pointer hover:bg-white/5 flex-col items-start gap-0"
-                        onClick={() => navigate(`/obra/${obra.id}/novo-capitulo`)}>
+                        onClick={() => navigate(/obra/${obra.id}/novo-capitulo)}>
                         <span className="text-sm text-white/90 truncate w-full">{obra.title}</span>
                         <span className="text-xs text-muted-foreground">
                           {obra.status === "aprovada" ? "✅ Aprovada" : obra.status === "em_espera" ? "⏳ Pendente" : "❌ Rejeitada"}
@@ -102,7 +102,7 @@ export default function Topbar() {
             )}
             {isAdmin && (
               <Link href="/admin">
-                <Button variant="ghost" size="sm" className={`text-white/70 hover:text-white hover:bg-white/5 ${location.startsWith("/admin") ? "text-white bg-white/5" : ""}`}>
+                <Button variant="ghost" size="sm" className={text-white/70 hover:text-white hover:bg-white/5 ${location.startsWith("/admin") ? "text-white bg-white/5" : ""}}>
                   <Shield className="w-4 h-4 mr-1.5" />Admin
                 </Button>
               </Link>
@@ -113,9 +113,8 @@ export default function Topbar() {
           <div className="flex items-center gap-2">
             {isAuthenticated ? (
               <>
-                {roleInfo && <span className={`asc-badge ${roleInfo.cls} hidden sm:inline-flex`}>{roleInfo.label}</span>}
+                {roleInfo && <span className={asc-badge ${roleInfo.cls} hidden sm:inline-flex}>{roleInfo.label}</span>}
 
-                {/* ✅ Sino de notificações */}
                 <Button variant="ghost" size="icon"
                   className="relative rounded-full text-white/70 hover:text-white hover:bg-white/5"
                   onClick={() => setShowNotificacoes(true)}>
@@ -142,7 +141,7 @@ export default function Topbar() {
                           e.preventDefault(); e.stopPropagation();
                           navigator.clipboard.writeText(String(user?.id ?? ""));
                           const el = e.currentTarget.querySelector("span");
-                          if (el) { el.textContent = "Copiado!"; setTimeout(() => { el.textContent = `ID: #${user?.id}`; }, 1500); }
+                          if (el) { el.textContent = "Copiado!"; setTimeout(() => { el.textContent = ID: #${user?.id}; }, 1500); }
                         }}>
                         <Copy className="w-3 h-3 group-hover:text-primary" /><span>ID: #{user?.id}</span>
                       </button>
@@ -154,8 +153,6 @@ export default function Topbar() {
                     <DropdownMenuItem asChild>
                       <Link href="/biblioteca" className="cursor-pointer"><Library className="w-4 h-4 mr-2" /> Minha Biblioteca</Link>
                     </DropdownMenuItem>
-
-                    {/* ✅ Botão quero ser tradutor só para usuário comum */}
                     {isUsuarioComum && (
                       <>
                         <DropdownMenuSeparator />
@@ -164,7 +161,6 @@ export default function Topbar() {
                         </DropdownMenuItem>
                       </>
                     )}
-
                     {isTranslator && (
                       <>
                         <DropdownMenuItem onClick={() => navigate("/nova-obra")} className="cursor-pointer">
@@ -177,7 +173,7 @@ export default function Topbar() {
                             </div>
                             {minhasObras.map((obra) => (
                               <DropdownMenuItem key={obra.id} className="cursor-pointer flex-col items-start gap-0 pl-5"
-                                onClick={() => navigate(`/obra/${obra.id}/novo-capitulo`)}>
+                                onClick={() => navigate(/obra/${obra.id}/novo-capitulo)}>
                                 <span className="text-sm text-white/90 truncate w-full">{obra.title}</span>
                                 <span className="text-xs text-muted-foreground">
                                   {obra.status === "aprovada" ? "✅ Aprovada" : obra.status === "em_espera" ? "⏳ Pendente" : "❌ Rejeitada"}
@@ -200,11 +196,11 @@ export default function Topbar() {
                   </DropdownMenuContent>
                 </DropdownMenu>
               </>
-
-          ) : (
-          <GoogleLoginButton />
-          )}
+            ) : (
+              <GoogleLoginButton />
+            )}
           </div>
+
         </div>
       </header>
 
