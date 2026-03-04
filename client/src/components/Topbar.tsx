@@ -57,18 +57,30 @@ export default function Topbar() {
 
           {/* Nav */}
           <nav className="hidden md:flex items-center gap-1">
-            <Link href="/">
-              <Button variant="ghost" size="sm" className={text-white/70 hover:text-white hover:bg-white/5 ${location === "/" ? "text-white bg-white/5" : ""}}>
-                <BookOpen className="w-4 h-4 mr-1.5" />Catálogo
-              </Button>
-            </Link>
-            {isAuthenticated && (
-              <Link href="/biblioteca">
-                <Button variant="ghost" size="sm" className={text-white/70 hover:text-white hover:bg-white/5 ${location === "/biblioteca" ? "text-white bg-white/5" : ""}}>
-                  <Library className="w-4 h-4 mr-1.5" />Biblioteca
-                </Button>
-              </Link>
-            )}
+<Link href="/">
+  <Button
+    variant="ghost"
+    size="sm"
+    className={`text-white/70 hover:text-white hover:bg-white/5 ${location === "/" ? "text-white bg-white/5" : ""}`}
+  >
+    <BookOpen className="w-4 h-4 mr-1.5" />
+    Catálogo
+  </Button>
+</Link>
+           
+          
+{isAuthenticated && (
+  <Link href="/biblioteca">
+    <Button
+      variant="ghost"
+      size="sm"
+      className={`text-white/70 hover:text-white hover:bg-white/5 ${location === "/biblioteca" ? "text-white bg-white/5" : ""}`}
+    >
+      <Library className="w-4 h-4 mr-1.5" />
+      Biblioteca
+    </Button>
+  </Link>
+)}
             {isTranslator && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
