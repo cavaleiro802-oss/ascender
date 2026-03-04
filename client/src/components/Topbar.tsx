@@ -200,10 +200,13 @@ export default function Topbar() {
                 </DropdownMenu>
               </>
             ) : (
-              <Button size="sm" className="bg-primary hover:bg-primary/90 text-white font-semibold"
-                onClick={() => (window.location.href = getLoginUrl())}>
-                <LogIn className="w-4 h-4 mr-1.5" />Entrar
-              </Button>
+              import GoogleLoginButton from "./GoogleLoginButton";
+
+           // ...
+
+          ) : (
+          <GoogleLoginButton />
+          )}
             )}
           </div>
         </div>
