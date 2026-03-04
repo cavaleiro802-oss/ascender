@@ -24,11 +24,14 @@ const googleClient = new OAuth2Client(
 
 // ─── Inicia fluxo OAuth ───────────────────────────────────────────────────────
 authRouter.get("/google", (_req, res) => {
+  console.log("REDIRECT_URI:", REDIRECT_URI);
+
   const url = googleClient.generateAuthUrl({
     access_type: "offline",
     scope: ["profile", "email"],
     prompt: "select_account",
   });
+
   res.redirect(url);
 });
 
