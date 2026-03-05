@@ -11,8 +11,8 @@ import {
 import { useDebounce } from "@/hooks/useDebounce";
 
 const GENRES = [
-  "Ação", "Aventura", "Comédia", "Drama", "Fantasia",
-  "Horror", "Mistério", "Romance", "Sci-Fi", "Slice of Life",
+  "Novel", "Manhwar", "Ação", "Aventura", "Comédia", "Drama", "Fantasia", 
+ "Mangá", "Horror", "Mistério", "Romance", "Sci-Fi", "Slice of Life", "Culinaria",
 ];
 
 const CAROUSEL_SIZE = 20;
