@@ -41,7 +41,7 @@ async function enviarParaR2(buffer: Buffer, mimetype: string, pasta: string) {
     bucket: BUCKET,
     accessKeyId: process.env.R2_ACCESS_KEY_ID?.slice(0, 8) + "...",
  });
-  
+}
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 async function getUser(req: any) {
   const sessionId = req.cookies?.["asc_session"];
