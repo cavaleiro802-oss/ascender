@@ -12,7 +12,7 @@ import { ImagePlus, Loader2, Upload } from "lucide-react";
 
 const GENRES = [
 "Novel", "Manhwar", "Manga", "Ação", "Aventura", "Comédia", "Drama", "Fantasia",
-  "Horror", "Mistério", "Romance", "Sci-Fi", "Slice of Life", "Culinaria"
+  "Horror", "Mistério", "Romance", "Sci-Fi", "Slice of Life", "Culinaria",
   "Supernatural", "Esportes", "Histórico", "Psicológico", "Ecchi",
 ];
 
