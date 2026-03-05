@@ -2,7 +2,6 @@ import { useState, useRef } from "react";
 import { trpc } from "@/lib/trpc";
 import { useLocation } from "wouter";
 import Topbar from "@/components/Topbar";
-import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
