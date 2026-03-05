@@ -1,7 +1,6 @@
 import { Router } from "express";
 import multer from "multer";
-import { PutObjectCommand } from "@aws-sdk/client-s3";
-import { S3Client } from "@aws-sdk/client-s3";
+import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { v4 as uuid } from "uuid";
 import { checkRateLimit, LIMITS } from "./rateLimit";
 import { getSessao, getUserByOpenId } from "./db";
@@ -10,9 +9,8 @@ const uploadRouter = Router();
 
 const ROLES_TRADUTOR = ["tradutor_aprendiz", "tradutor_oficial", "admin_senhor", "admin_supremo"];
 const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_SIZE = 10 * 1024 * 1024;
 
-// ─── Cliente R2 ───────────────────────────────────────────────────────────────
 const r2 = new S3Client({
   region: "auto",
   endpoint: process.env.R2_ENDPOINT!,
@@ -25,7 +23,6 @@ const r2 = new S3Client({
 const BUCKET = process.env.R2_BUCKET ?? "ascender-imagens";
 const PUBLIC_URL = process.env.R2_PUBLIC_URL!;
 
-// ─── Multer (memória) ─────────────────────────────────────────────────────────
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_SIZE },
@@ -35,7 +32,6 @@ const upload = multer({
   },
 });
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
 async function getUser(req: any) {
   const sessionId = req.cookies?.["asc_session"];
   if (!sessionId || typeof sessionId !== "string" || sessionId.length !== 64) return null;
@@ -45,6 +41,10 @@ async function getUser(req: any) {
 }
 
 async function enviarParaR2(buffer: Buffer, mimetype: string, pasta: string) {
+  console.log("[R2] endpoint:", process.env.R2_ENDPOINT);
+  console.log("[R2] bucket:", BUCKET);
+  console.log("[R2] accessKeyId:", process.env.R2_ACCESS_KEY_ID?.slice(0, 8) + "...");
+
   const ext = mimetype.split("/")[1].replace("jpeg", "jpg");
   const key = `${pasta}/${uuid()}.${ext}`;
 
@@ -61,7 +61,6 @@ async function enviarParaR2(buffer: Buffer, mimetype: string, pasta: string) {
   };
 }
 
-// ─── Upload de capa ───────────────────────────────────────────────────────────
 uploadRouter.post("/capa", upload.single("file"), async (req, res) => {
   try {
     const user = await getUser(req);
@@ -77,11 +76,11 @@ uploadRouter.post("/capa", upload.single("file"), async (req, res) => {
     const result = await enviarParaR2(req.file.buffer, req.file.mimetype, "capas");
     res.json(result);
   } catch (e: any) {
+    console.error("[Upload capa] erro:", e.message);
     res.status(400).json({ error: e.message });
   }
 });
 
-// ─── Upload de páginas ────────────────────────────────────────────────────────
 uploadRouter.post("/paginas", upload.array("files", 100), async (req, res) => {
   try {
     const user = await getUser(req);
@@ -101,11 +100,11 @@ uploadRouter.post("/paginas", upload.array("files", 100), async (req, res) => {
 
     res.json({ urls });
   } catch (e: any) {
+    console.error("[Upload paginas] erro:", e.message);
     res.status(400).json({ error: e.message });
   }
 });
 
-// ─── Upload de avatar ─────────────────────────────────────────────────────────
 uploadRouter.post("/avatar", upload.single("file"), async (req, res) => {
   try {
     const user = await getUser(req);
@@ -120,6 +119,7 @@ uploadRouter.post("/avatar", upload.single("file"), async (req, res) => {
     const result = await enviarParaR2(req.file.buffer, req.file.mimetype, "avatars");
     res.json(result);
   } catch (e: any) {
+    console.error("[Upload avatar] erro:", e.message);
     res.status(400).json({ error: e.message });
   }
 });
