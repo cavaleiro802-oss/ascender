@@ -58,10 +58,17 @@ directives: {
 
 defaultSrc: ["'self'"],
 
-connectSrc: ["'self'", SITE_URL, "https://accounts.google.com", "https://oauth2.googleapis.com"].filter(Boolean),
-
-imgSrc: ["'self'", "data:", "https://*.r2.dev", "https://lh3.googleusercontent.com"],
-
+connectSrc: ["'self'", SITE_URL, "https://accounts.google.com", "https://oauth2.googleapis.com", 
+             "https://*.r2.cloudflarestorage.com" ].filter(Boolean),
+imgSrc: [
+  "'self'",
+  "data:",
+  "blob:",
+  "https://*.r2.dev",
+  "https://*.r2.cloudflarestorage.com",
+  "https://lh3.googleusercontent.com"
+],
+ 
 scriptSrc: ["'self'", "'unsafe-inline'", "https://accounts.google.com", "https://apis.google.com"],
 
 scriptSrcElem: ["'self'", "'unsafe-inline'", "https://accounts.google.com", "https://apis.google.com"],
