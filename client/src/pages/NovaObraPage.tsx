@@ -62,20 +62,24 @@ export default function NovaObraPage() {
     );
   }
 
-  function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    if (!["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(file.type)) {
-      toast.error("Formato inválido. Use JPG, PNG ou WebP.");
-      return;
-    }
-    if (file.size > 10 * 1024 * 1024) {
-      toast.error("Imagem muito grande. Máximo 10MB.");
-      return;
-    }
-    setCoverFile(file);
-    setCoverPreview(URL.createObjectURL(file));
+function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
+  const file = e.target.files?.[0];
+  if (!file) return;
+  if (!["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(file.type)) {
+    toast.error("Formato inválido. Use JPG, PNG ou WebP.");
+    return;
   }
+  if (file.size > 10 * 1024 * 1024) {
+    toast.error("Imagem muito grande. Máximo 10MB.");
+    return;
+  }
+  setCoverFile(file);
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    setCoverPreview(ev.target?.result as string);
+  };
+  reader.readAsDataURL(file);
+}
 
   function toggleGenre(g: string) {
     setSelectedGenres((prev) =>
