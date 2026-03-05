@@ -32,7 +32,7 @@ const ROLE_LABELS: Record<string, { label: string; cls: string }> = {
   usuario: { label: "Usuário", cls: "asc-badge-blue" },
   tradutor_aprendiz: { label: "Trad. Aprendiz", cls: "asc-badge-yellow" },
   tradutor_oficial: { label: "Trad. Oficial", cls: "asc-badge-green" },
-  admin: { label: "Admin", cls: "asc-badge-red" },
+  admin_senhor: { label: "Admin. senhor", cls: "asc-badge-red" },
   admin_supremo: { label: "Admin Supremo", cls: "asc-badge-purple" },
 };
 
