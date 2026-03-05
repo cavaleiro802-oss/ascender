@@ -121,7 +121,10 @@ app.use("/trpc", createExpressMiddleware({
 if (isProd) {
   const clientDist = path.join(process.cwd(), "dist/client");
   console.log("clientDist =", clientDist, "| exists?", require("fs").existsSync(clientDist));
-  app.use(express.static(clientDist, { maxAge: "7d", etag: true }));
+  app.use((req, res, next) => {  
+  if (req.path.startsWith("/api/") || req.path.startsWith("/trpc/")) return next();  
+  express.static(clientDist, { maxAge: "7d", etag: true })(req, res, next);  
+});
   app.get("*", (_req, res) => {
     const indexFile = path.join(clientDist, "index.html");
     if (require("fs").existsSync(indexFile)) {
