@@ -1,5 +1,4 @@
 import { useAuth } from "@/hooks/useAuth";
-import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
 import {
   BookOpen,
@@ -41,7 +40,6 @@ export default function ObraPage() {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
   const [comment, setComment] = useState("");
-
   const utils = trpc.useUtils();
 
   const { data: obra, isLoading } = trpc.obras.byId.useQuery({ id: obraId });
@@ -58,32 +56,35 @@ export default function ObraPage() {
   );
 
   const incrementViews = trpc.obras.incrementViews.useMutation();
+
   const toggleCurtida = trpc.curtidas.toggle.useMutation({
     onSuccess: () => {
       utils.curtidas.count.invalidate({ obraId });
       utils.curtidas.status.invalidate({ obraId });
     },
   });
+
   const toggleFav = trpc.favoritos.toggle.useMutation({
     onSuccess: () => utils.favoritos.status.invalidate({ obraId }),
   });
+
   const addComentario = trpc.comentarios.create.useMutation({
     onSuccess: () => {
-      setComment("");
       utils.comentarios.list.invalidate({ obraId });
       toast.success("Comentário adicionado!");
     },
   });
+
   const deleteComentario = trpc.comentarios.delete.useMutation({
     onSuccess: () => utils.comentarios.list.invalidate({ obraId }),
   });
 
-  // Register view on load
   useEffect(() => {
     if (obraId) incrementViews.mutate({ id: obraId });
   }, [obraId]);
 
-  const isAdmin = user?.role === "admin" || user?.role === "admin_supremo";
+  // ✅ Roles corrigidos
+  const isAdmin = user?.role === "admin_senhor" || user?.role === "admin_supremo";
   const isTranslator = user?.role === "tradutor_aprendiz" || user?.role === "tradutor_oficial" || isAdmin;
   const isOwnerOrAdmin = isTranslator && (obra?.authorId === user?.id || isAdmin);
   const genres = parseGenres(obra?.genres);
@@ -114,7 +115,6 @@ export default function ObraPage() {
   return (
     <div className="min-h-screen">
       <Topbar />
-
       <main className="container py-6">
         {/* Breadcrumb */}
         <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-6">
@@ -128,8 +128,20 @@ export default function ObraPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left: Cover + Actions */}
           <div className="lg:col-span-1">
-            <div className="asc-cover w-full aspect-[3/4] max-w-xs mx-auto lg:mx-0 flex items-center justify-center mb-4">
-              <BookOpen className="w-16 h-16 text-primary/50" />
+            {/* ✅ Capa corrigida */}
+            <div className="w-full aspect-[3/4] max-w-xs mx-auto lg:mx-0 rounded-xl overflow-hidden border border-border mb-4">
+              {obra.coverUrl ? (
+                <img
+                  src={obra.coverUrl}
+                  alt={obra.title}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              ) : (
+                <div className="w-full h-full bg-secondary flex items-center justify-center">
+                  <BookOpen className="w-16 h-16 text-primary/50" />
+                </div>
+              )}
             </div>
 
             <div className="flex flex-col gap-2">
@@ -166,7 +178,7 @@ export default function ObraPage() {
                 <Button
                   variant="outline"
                   className="w-full border-border bg-transparent text-white/60"
-                  onClick={() => (window.location.href = getLoginUrl())}
+                  onClick={() => navigate("/login")}
                 >
                   <Heart className="w-4 h-4 mr-1.5" />
                   {kk(curtidaCount)} curtidas
@@ -272,7 +284,6 @@ export default function ObraPage() {
                 <MessageSquare className="w-4 h-4" />
                 Comentários ({comentarios.length})
               </h2>
-
               {isAuthenticated ? (
                 <div className="mb-4 space-y-1">
                   <div className="flex gap-2">
@@ -287,7 +298,7 @@ export default function ObraPage() {
                     <Button
                       size="icon"
                       className="bg-primary hover:bg-primary/90 text-white flex-shrink-0 self-end"
-                      onClick={() => { addComentario.mutate({ obraId, content: comment }); setComment(""); }}
+                      onClick={() => addComentario.mutate({ obraId, content: comment })}
                       disabled={!comment.trim() || addComentario.isPending}
                     >
                       <Send className="w-4 h-4" />
@@ -301,14 +312,13 @@ export default function ObraPage() {
                 <p className="text-sm text-muted-foreground mb-4">
                   <span
                     className="text-primary cursor-pointer hover:underline"
-                    onClick={() => (window.location.href = getLoginUrl())}
+                    onClick={() => navigate("/login")}
                   >
                     Faça login
                   </span>{" "}
                   para comentar.
                 </p>
               )}
-
               <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
                 {comentarios.length === 0 ? (
                   <p className="text-muted-foreground text-sm">Seja o primeiro a comentar!</p>
