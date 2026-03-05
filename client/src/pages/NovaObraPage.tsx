@@ -11,8 +11,8 @@ import { toast } from "sonner";
 import { ImagePlus, Loader2, Upload } from "lucide-react";
 
 const GENRES = [
-  "Ação", "Aventura", "Comédia", "Drama", "Fantasia",
-  "Horror", "Mistério", "Romance", "Sci-Fi", "Slice of Life",
+"Novel", "Manhwar", "Manga", "Ação", "Aventura", "Comédia", "Drama", "Fantasia",
+  "Horror", "Mistério", "Romance", "Sci-Fi", "Slice of Life", "Culinaria"
   "Supernatural", "Esportes", "Histórico", "Psicológico", "Ecchi",
 ];
 
