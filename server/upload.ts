@@ -1,14 +1,41 @@
 import { Router } from "express";
-import { gerarUrlUpload } from "./r2";
+import multer from "multer";
+import { PutObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client } from "@aws-sdk/client-s3";
+import { v4 as uuid } from "uuid";
 import { checkRateLimit, LIMITS } from "./rateLimit";
 import { getSessao, getUserByOpenId } from "./db";
 
 const uploadRouter = Router();
 
-// ─── Roles que podem fazer upload de conteúdo (capa/páginas) ─────────────────
-const ROLES_TRADUTOR = ["tradutor_aprendiz", "tradutor_oficial", "admin", "admin_supremo"];
+const ROLES_TRADUTOR = ["tradutor_aprendiz", "tradutor_oficial", "admin_senhor", "admin_supremo"];
+const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
+const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 
-// ✅ Corrigido: usa sessionId → getSessao → getUserByOpenId
+// ─── Cliente R2 ───────────────────────────────────────────────────────────────
+const r2 = new S3Client({
+  region: "auto",
+  endpoint: process.env.R2_ENDPOINT!,
+  credentials: {
+    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
+  },
+});
+
+const BUCKET = process.env.R2_BUCKET ?? "ascender-imagens";
+const PUBLIC_URL = process.env.R2_PUBLIC_URL!;
+
+// ─── Multer (memória) ─────────────────────────────────────────────────────────
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_SIZE },
+  fileFilter: (_req, file, cb) => {
+    if (ALLOWED_TYPES.includes(file.mimetype)) cb(null, true);
+    else cb(new Error("Tipo de arquivo não permitido. Use JPG, PNG ou WebP."));
+  },
+});
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 async function getUser(req: any) {
   const sessionId = req.cookies?.["asc_session"];
   if (!sessionId || typeof sessionId !== "string" || sessionId.length !== 64) return null;
@@ -17,76 +44,80 @@ async function getUser(req: any) {
   return getUserByOpenId(sessao.openId);
 }
 
-// ─── Upload de capa (somente Tradutor+) ──────────────────────────────────────
-uploadRouter.post("/capa", async (req, res) => {
+async function enviarParaR2(buffer: Buffer, mimetype: string, pasta: string) {
+  const ext = mimetype.split("/")[1].replace("jpeg", "jpg");
+  const key = `${pasta}/${uuid()}.${ext}`;
+
+  await r2.send(new PutObjectCommand({
+    Bucket: BUCKET,
+    Key: key,
+    Body: buffer,
+    ContentType: mimetype,
+  }));
+
+  return {
+    key,
+    publicUrl: `${PUBLIC_URL}/${key}`,
+  };
+}
+
+// ─── Upload de capa ───────────────────────────────────────────────────────────
+uploadRouter.post("/capa", upload.single("file"), async (req, res) => {
   try {
     const user = await getUser(req);
     if (!user) return res.status(401).json({ error: "Faça login primeiro." });
     if (user.banned || user.bannedTotal) return res.status(403).json({ error: "Conta suspensa." });
-    if (!ROLES_TRADUTOR.includes(user.role)) {
-      return res.status(403).json({ error: "Somente tradutores podem enviar capas." });
-    }
+    if (!ROLES_TRADUTOR.includes(user.role)) return res.status(403).json({ error: "Somente tradutores podem enviar capas." });
+
     const rl = checkRateLimit({ key: `upload:${user.id}`, ...LIMITS.upload });
     if (!rl.allowed) return res.status(429).json({ error: `Muitos uploads. Tente em ${rl.retryAfterSec}s.` });
 
-    // ✅ Validar body antes de usar
-    const { tipo, tamanho } = req.body;
-    if (!tipo || typeof tipo !== "string") return res.status(400).json({ error: "Tipo de arquivo obrigatório." });
-    if (!tamanho || typeof tamanho !== "number") return res.status(400).json({ error: "Tamanho de arquivo obrigatório." });
+    if (!req.file) return res.status(400).json({ error: "Arquivo obrigatório." });
 
-    const result = await gerarUrlUpload({ pasta: "capas", tipo, tamanho });
+    const result = await enviarParaR2(req.file.buffer, req.file.mimetype, "capas");
     res.json(result);
   } catch (e: any) {
     res.status(400).json({ error: e.message });
   }
 });
 
-// ─── Upload de páginas (somente Tradutor+) ───────────────────────────────────
-uploadRouter.post("/paginas", async (req, res) => {
+// ─── Upload de páginas ────────────────────────────────────────────────────────
+uploadRouter.post("/paginas", upload.array("files", 100), async (req, res) => {
   try {
     const user = await getUser(req);
     if (!user) return res.status(401).json({ error: "Faça login primeiro." });
     if (user.banned || user.bannedTotal) return res.status(403).json({ error: "Conta suspensa." });
-    // ✅ Somente tradutores podem fazer upload de páginas
-    if (!ROLES_TRADUTOR.includes(user.role)) {
-      return res.status(403).json({ error: "Somente tradutores podem enviar páginas." });
-    }
+    if (!ROLES_TRADUTOR.includes(user.role)) return res.status(403).json({ error: "Somente tradutores podem enviar páginas." });
 
     const rl = checkRateLimit({ key: `upload:${user.id}`, ...LIMITS.upload });
     if (!rl.allowed) return res.status(429).json({ error: `Muitos uploads. Tente em ${rl.retryAfterSec}s.` });
 
-    const { arquivos } = req.body as { arquivos: { tipo: string; tamanho: number }[] };
-    if (!Array.isArray(arquivos) || arquivos.length === 0) {
-      return res.status(400).json({ error: "Nenhum arquivo enviado." });
-    }
-    if (arquivos.length > 100) {
-      return res.status(400).json({ error: "Máximo de 100 páginas por capítulo." });
-    }
+    const files = req.files as Express.Multer.File[];
+    if (!files || files.length === 0) return res.status(400).json({ error: "Nenhum arquivo enviado." });
 
     const urls = await Promise.all(
-      arquivos.map((a) => gerarUrlUpload({ pasta: "paginas", tipo: a.tipo, tamanho: a.tamanho }))
+      files.map((f) => enviarParaR2(f.buffer, f.mimetype, "paginas"))
     );
+
     res.json({ urls });
   } catch (e: any) {
     res.status(400).json({ error: e.message });
   }
 });
 
-// ─── Upload de avatar (qualquer usuário logado) ───────────────────────────────
-uploadRouter.post("/avatar", async (req, res) => {
+// ─── Upload de avatar ─────────────────────────────────────────────────────────
+uploadRouter.post("/avatar", upload.single("file"), async (req, res) => {
   try {
     const user = await getUser(req);
     if (!user) return res.status(401).json({ error: "Faça login primeiro." });
     if (user.bannedTotal) return res.status(403).json({ error: "Conta suspensa." });
+
     const rl = checkRateLimit({ key: `upload:${user.id}`, ...LIMITS.upload });
     if (!rl.allowed) return res.status(429).json({ error: `Muitos uploads. Tente em ${rl.retryAfterSec}s.` });
 
-    // ✅ Validar body antes de usar
-    const { tipo, tamanho } = req.body;
-    if (!tipo || typeof tipo !== "string") return res.status(400).json({ error: "Tipo de arquivo obrigatório." });
-    if (!tamanho || typeof tamanho !== "number") return res.status(400).json({ error: "Tamanho de arquivo obrigatório." });
+    if (!req.file) return res.status(400).json({ error: "Arquivo obrigatório." });
 
-    const result = await gerarUrlUpload({ pasta: "avatars", tipo, tamanho });
+    const result = await enviarParaR2(req.file.buffer, req.file.mimetype, "avatars");
     res.json(result);
   } catch (e: any) {
     res.status(400).json({ error: e.message });
