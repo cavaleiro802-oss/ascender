@@ -41,7 +41,7 @@ export default function AdminPage() {
   const [, navigate] = useLocation();
   const { tab } = useParams<{ tab?: string }>();
 
-  const isAdmin = user?.role === "admin" || user?.role === "admin_supremo";
+  const isAdmin = user?.role === "admin_senhor" || user?.role === "admin_supremo";
   const isSupreme = user?.role === "admin_supremo";
 
   const { data: stats } = trpc.admin.stats.useQuery({ enabled: isAdmin } as any);
@@ -277,7 +277,7 @@ function CapitulosTab() {
 const ROLE_FILTER_OPTIONS = [
   { value: "todos", label: "Todos" },
   { value: "admin_supremo", label: "Admin Supremo" },
-  { value: "admin", label: "Admin" },
+  { value: "admin_senhor", label: "Admin. senhor" },
   { value: "tradutor_oficial", label: "Trad. Oficial" },
   { value: "tradutor_aprendiz", label: "Trad. Aprendiz" },
   { value: "usuario", label: "Usuário" },
@@ -313,7 +313,7 @@ function UsuariosTab({ isSupreme, currentUserId }: { isSupreme: boolean; current
   });
 
   const availableRoles = isSupreme
-    ? ["usuario", "tradutor_aprendiz", "tradutor_oficial", "admin"]
+    ? ["usuario", "tradutor_aprendiz", "tradutor_oficial", "admin_senhor"]
     : ["usuario", "tradutor_aprendiz", "tradutor_oficial"];
 
   return (
