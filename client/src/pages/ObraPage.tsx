@@ -1,10 +1,11 @@
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import {
-  BookOpen, ChevronRight, Eye, Flame, Heart,
-  MessageSquare, Send, Star, Trash2, Pencil, X, Check,
+  BookOpen, ChevronRight, Eye, Flame, Heart, MessageSquare,
+  Send, Star, Trash2, Pencil, X, Check, Flag, Reply,
+  ChevronLeft, ChevronDown, Camera,
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import AscenderLoader from "@/components/AscenderLoader";
 import { useLocation, useParams } from "wouter";
 import Topbar from "@/components/Topbar";
@@ -12,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
+import { uploadCapa } from "@/lib/upload";
 
 function kk(n: number): string {
   if (n >= 1000) return (n / 1000).toFixed(1) + "k";
@@ -27,29 +29,98 @@ function parseGenres(genres?: string | null): string[] {
 }
 
 const ANDAMENTO_CONFIG = {
-  em_andamento: { label: "Em Andamento", cls: "border-green-500/50 text-green-400 bg-green-500/10" },
-  iato:         { label: "Iato",         cls: "border-yellow-500/50 text-yellow-400 bg-yellow-500/10" },
-  finalizado:   { label: "Finalizado",   cls: "border-blue-500/50 text-blue-400 bg-blue-500/10" },
+  em_andamento: { label: "Em Andamento", cls: "text-green-400 border-green-500/40 bg-green-500/10" },
+  iato:         { label: "Iato",         cls: "text-yellow-400 border-yellow-500/40 bg-yellow-500/10" },
+  finalizado:   { label: "Finalizado",   cls: "text-blue-400 border-blue-500/40 bg-blue-500/10" },
 } as const;
 
 const GENRES_LIST = [
-  "Novel", "Manhwar", "Manga", "Ação", "Aventura", "Comédia", "Drama", "Fantasia",
-  "Horror", "Mistério", "Romance", "Sci-Fi", "Slice of Life", "Culinaria",
-  "Supernatural", "Esportes", "Histórico", "Psicológico", "Ecchi",
+  "Novel","Manhwar","Manga","Ação","Aventura","Comédia","Drama","Fantasia",
+  "Horror","Mistério","Romance","Sci-Fi","Slice of Life","Culinaria",
+  "Supernatural","Esportes","Histórico","Psicológico","Ecchi",
 ];
+
+const CAPS_PER_PAGE = 40;
+
+// ─── Componente de comentário ─────────────────────────────────────────────────
+function Comentario({
+  c, isAdmin, userId, obraId, onReply, onDelete,
+}: {
+  c: any; isAdmin: boolean; userId?: number; obraId: number;
+  onReply: (id: number, nome: string) => void;
+  onDelete: (id: number) => void;
+}) {
+  const [showActions, setShowActions] = useState(false);
+  const nome = c.autorNome || `Usuário #${c.autorId}`;
+  const inicial = nome.slice(0, 1).toUpperCase();
+
+  return (
+    <div className="flex gap-3 group">
+      <div className="w-8 h-8 rounded-full bg-primary/20 flex-shrink-0 flex items-center justify-center text-xs font-bold text-primary mt-0.5">
+        {c.autorAvatar ? (
+          <img src={c.autorAvatar} alt={nome} className="w-full h-full object-cover rounded-full" />
+        ) : inicial}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-xs font-semibold text-white/80">{nome}</span>
+          <span className="text-[10px] text-muted-foreground">
+            {new Date(c.createdAt).toLocaleDateString("pt-BR")}
+          </span>
+        </div>
+        {c.parentId && c.parentAutorNome && (
+          <p className="text-[11px] text-primary/60 mb-1 flex items-center gap-1">
+            <Reply className="w-3 h-3" /> respondendo @{c.parentAutorNome}
+          </p>
+        )}
+        <p className="text-sm text-white/75 leading-relaxed">{c.content}</p>
+        <div className="flex items-center gap-3 mt-1.5">
+          <button
+            onClick={() => onReply(c.id, nome)}
+            className="text-[11px] text-muted-foreground hover:text-primary transition-colors flex items-center gap-1"
+          >
+            <Reply className="w-3 h-3" /> Responder
+          </button>
+          {isAdmin && (
+            <button
+              onClick={() => onDelete(c.id)}
+              className="text-[11px] text-muted-foreground hover:text-red-400 transition-colors flex items-center gap-1 opacity-0 group-hover:opacity-100"
+            >
+              <Trash2 className="w-3 h-3" /> Deletar
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
 
 export default function ObraPage() {
   const { id } = useParams<{ id: string }>();
   const obraId = parseInt(id ?? "0");
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
+  const utils = trpc.useUtils();
+  const coverFileRef = useRef<HTMLInputElement>(null);
+
+  // tabs
+  const [activeTab, setActiveTab] = useState<"capitulos" | "comentarios">("capitulos");
+  const [capPage, setCapPage] = useState(0);
+  const [sinopseExpandida, setSinopseExpandida] = useState(false);
+
+  // comentários
   const [comment, setComment] = useState("");
+  const [replyTo, setReplyTo] = useState<{ id: number; nome: string } | null>(null);
+
+  // edição
   const [editando, setEditando] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editSynopsis, setEditSynopsis] = useState("");
-  const [editAndamento, setEditAndamento] = useState<"em_andamento" | "iato" | "finalizado">("em_andamento");
+  const [editAndamento, setEditAndamento] = useState<keyof typeof ANDAMENTO_CONFIG>("em_andamento");
   const [editGenres, setEditGenres] = useState<string[]>([]);
-  const utils = trpc.useUtils();
+  const [editCoverFile, setEditCoverFile] = useState<File | null>(null);
+  const [editCoverPreview, setEditCoverPreview] = useState<string | null>(null);
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const { data: obra, isLoading } = trpc.obras.byId.useQuery({ id: obraId });
   const { data: capitulos = [] } = trpc.capitulos.list.useQuery({ obraId });
@@ -60,43 +131,39 @@ export default function ObraPage() {
 
   const incrementViews = trpc.obras.incrementViews.useMutation();
   const toggleCurtida = trpc.curtidas.toggle.useMutation({
-    onSuccess: () => {
-      utils.curtidas.count.invalidate({ obraId });
-      utils.curtidas.status.invalidate({ obraId });
-    },
+    onSuccess: () => { utils.curtidas.count.invalidate({ obraId }); utils.curtidas.status.invalidate({ obraId }); },
   });
   const toggleFav = trpc.favoritos.toggle.useMutation({
     onSuccess: () => utils.favoritos.status.invalidate({ obraId }),
   });
   const addComentario = trpc.comentarios.create.useMutation({
-    onSuccess: () => {
-      utils.comentarios.list.invalidate({ obraId });
-      toast.success("Comentário adicionado!");
-    },
+    onSuccess: () => { utils.comentarios.list.invalidate({ obraId }); setComment(""); setReplyTo(null); toast.success("Comentário enviado!"); },
   });
   const deleteComentario = trpc.comentarios.delete.useMutation({
     onSuccess: () => utils.comentarios.list.invalidate({ obraId }),
   });
   const updateObra = trpc.obras.update.useMutation({
-    onSuccess: () => {
-      utils.obras.byId.invalidate({ id: obraId });
-      setEditando(false);
-      toast.success("Obra atualizada!");
-    },
+    onSuccess: () => { utils.obras.byId.invalidate({ id: obraId }); setEditando(false); toast.success("Obra atualizada!"); },
     onError: (e) => toast.error(e.message),
   });
 
-  useEffect(() => {
-    if (obraId) incrementViews.mutate({ id: obraId });
-  }, [obraId]);
+  useEffect(() => { if (obraId) incrementViews.mutate({ id: obraId }); }, [obraId]);
 
   const isAdmin = user?.role === "admin_senhor" || user?.role === "admin_supremo";
   const isSupreme = user?.role === "admin_supremo";
-  const isTranslator = user?.role === "tradutor_aprendiz" || user?.role === "tradutor_oficial" || isAdmin;
+  const isTranslator = ["tradutor_aprendiz","tradutor_oficial","admin_senhor","admin_supremo"].includes(user?.role ?? "");
   const isOwnerOrAdmin = isTranslator && (obra?.authorId === user?.id || isAdmin);
   const genres = parseGenres(obra?.genres);
   const andamento = (obra as any)?.andamento as keyof typeof ANDAMENTO_CONFIG | undefined;
   const andamentoInfo = andamento ? ANDAMENTO_CONFIG[andamento] : null;
+
+  // paginação capítulos
+  const totalCapPages = Math.ceil(capitulos.length / CAPS_PER_PAGE);
+  const capsPage = capitulos.slice(capPage * CAPS_PER_PAGE, (capPage + 1) * CAPS_PER_PAGE);
+
+  // comentários raiz e respostas
+  const comentariosRaiz = comentarios.filter((c: any) => !c.parentId);
+  const respostasPor = (parentId: number) => comentarios.filter((c: any) => c.parentId === parentId);
 
   function abrirEdicao() {
     if (!obra) return;
@@ -104,338 +171,412 @@ export default function ObraPage() {
     setEditSynopsis(obra.synopsis ?? "");
     setEditAndamento((obra as any).andamento ?? "em_andamento");
     setEditGenres(parseGenres(obra.genres));
+    setEditCoverPreview(obra.coverUrl ?? null);
+    setEditCoverFile(null);
     setEditando(true);
   }
 
-  function toggleEditGenre(g: string) {
-    setEditGenres((prev) =>
-      prev.includes(g) ? prev.filter((x) => x !== g) : prev.length < 5 ? [...prev, g] : prev
-    );
+  function handleEditCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) { toast.error("Máximo 10MB."); return; }
+    setEditCoverFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setEditCoverPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
   }
 
-  function salvarEdicao() {
+  async function salvarEdicao() {
     if (!editTitle.trim()) return toast.error("Título obrigatório.");
-    updateObra.mutate({
-      id: obraId,
-      title: editTitle.trim(),
-      synopsis: editSynopsis.trim() || undefined,
-      andamento: editAndamento,
-      genres: editGenres,
-    });
+    setSavingEdit(true);
+    try {
+      let coverUrl = (obra as any)?.coverUrl;
+      if (editCoverFile) {
+        const r = await uploadCapa(editCoverFile);
+        coverUrl = r.publicUrl;
+      }
+      await updateObra.mutateAsync({
+        id: obraId,
+        title: editTitle.trim(),
+        synopsis: editSynopsis.trim() || undefined,
+        andamento: editAndamento,
+        genres: editGenres,
+        coverUrl,
+      });
+    } catch (e: any) {
+      toast.error(e.message || "Erro ao salvar.");
+    } finally {
+      setSavingEdit(false);
+    }
   }
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen">
-        <Topbar />
-        <AscenderLoader inline text="Carregando obra..." />
-      </div>
-    );
+  function toggleEditGenre(g: string) {
+    setEditGenres((p) => p.includes(g) ? p.filter((x) => x !== g) : p.length < 5 ? [...p, g] : p);
   }
 
-  if (!obra) {
-    return (
-      <div className="min-h-screen">
-        <Topbar />
-        <div className="container py-12 text-center">
-          <p className="text-muted-foreground">Obra não encontrada.</p>
-          <Button className="mt-4" onClick={() => navigate("/")}>Voltar ao catálogo</Button>
-        </div>
-      </div>
-    );
+  function handleReply(id: number, nome: string) {
+    setReplyTo({ id, nome });
+    setActiveTab("comentarios");
+    setTimeout(() => document.getElementById("comment-input")?.focus(), 100);
   }
+
+  function enviarComentario() {
+    if (!comment.trim()) return;
+    addComentario.mutate({ obraId, content: comment, parentId: replyTo?.id });
+  }
+
+  if (isLoading) return <div className="min-h-screen"><Topbar /><AscenderLoader inline text="Carregando obra..." /></div>;
+
+  if (!obra) return (
+    <div className="min-h-screen"><Topbar />
+      <div className="container py-12 text-center">
+        <p className="text-muted-foreground">Obra não encontrada.</p>
+        <Button className="mt-4" onClick={() => navigate("/")}>Voltar</Button>
+      </div>
+    </div>
+  );
+
+  const sinopse = obra.synopsis ?? "";
+  const sinopseCorta = sinopse.length > 180;
 
   return (
     <div className="min-h-screen">
       <Topbar />
-      <main className="container py-6">
-        {/* Breadcrumb */}
-        <div className="flex items-center gap-1.5 text-xs text-muted-foreground mb-6">
-          <span className="cursor-pointer hover:text-white" onClick={() => navigate("/")}>Catálogo</span>
-          <ChevronRight className="w-3 h-3" />
-          <span className="text-white/80">{obra.title}</span>
+
+      {/* Hero — capa full-width com blur */}
+      <div className="relative w-full overflow-hidden" style={{ height: 280 }}>
+        {obra.coverUrl && (
+          <img src={obra.coverUrl} alt="" className="w-full h-full object-cover object-top blur-sm scale-110 opacity-30" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/60 to-background" />
+        {/* Capa centralizada */}
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 z-10">
+          <div className="relative w-32 sm:w-40 aspect-[3/4] rounded-xl overflow-hidden border-2 border-border shadow-2xl shadow-black">
+            {obra.coverUrl ? (
+              <img src={obra.coverUrl} alt={obra.title} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full bg-secondary flex items-center justify-center">
+                <BookOpen className="w-8 h-8 text-primary/50" />
+              </div>
+            )}
+            {/* Botão editar capa */}
+            {isSupreme && (
+              <button
+                onClick={() => coverFileRef.current?.click()}
+                className="absolute inset-0 bg-black/60 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity"
+              >
+                <Camera className="w-6 h-6 text-white" />
+              </button>
+            )}
+          </div>
+        </div>
+        <input ref={coverFileRef} type="file" accept="image/*" className="hidden" onChange={handleEditCoverChange} />
+      </div>
+
+      <main className="container max-w-2xl mx-auto pt-24 pb-10 px-4">
+
+        {/* Título e info */}
+        <div className="text-center mb-5">
+          <div className="flex items-center justify-center gap-2 mb-2 flex-wrap">
+            {genres[0] && (
+              <span className="bg-primary text-white text-[10px] font-black px-2.5 py-0.5 rounded-full uppercase tracking-widest">
+                {genres[0]}
+              </span>
+            )}
+            {andamentoInfo && (
+              <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${andamentoInfo.cls}`}>
+                {andamentoInfo.label}
+              </span>
+            )}
+          </div>
+          <h1 className="text-2xl sm:text-3xl font-black text-white mb-2 leading-tight">{obra.title}</h1>
+          <p className="text-sm text-muted-foreground mb-1">
+            <BookOpen className="w-3.5 h-3.5 inline mr-1" />
+            {capitulos.length} cap{capitulos.length !== 1 ? "s" : ""}
+          </p>
+          <div className="flex items-center justify-center gap-4 text-sm text-muted-foreground mt-2">
+            <span className="flex items-center gap-1"><Eye className="w-3.5 h-3.5" />{kk(obra.viewsTotal ?? 0)}</span>
+            <span className="flex items-center gap-1 text-orange-400"><Flame className="w-3.5 h-3.5" />{kk(obra.viewsWeek ?? 0)}</span>
+          </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left: Cover + Actions */}
-          <div className="lg:col-span-1">
-            <div className="w-full aspect-[3/4] max-w-xs mx-auto lg:mx-0 rounded-xl overflow-hidden border border-border mb-4">
-              {obra.coverUrl ? (
-                <img src={obra.coverUrl} alt={obra.title} className="w-full h-full object-cover" loading="lazy" />
-              ) : (
-                <div className="w-full h-full bg-secondary flex items-center justify-center">
-                  <BookOpen className="w-16 h-16 text-primary/50" />
-                </div>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-2">
-              {capitulos.length > 0 && (
-                <Button
-                  className="w-full bg-primary hover:bg-primary/90 text-white font-semibold"
-                  onClick={() => navigate(`/obra/${obraId}/capitulo/${capitulos[0].id}`)}
-                >
-                  <BookOpen className="w-4 h-4 mr-1.5" />
-                  Começar a ler
-                </Button>
-              )}
-              {isAuthenticated ? (
-                <>
-                  <Button
-                    variant="outline"
-                    className={`w-full border-border bg-transparent ${isFav ? "text-yellow-400 border-yellow-400/40" : "text-white/60"}`}
-                    onClick={() => toggleFav.mutate({ obraId })}
-                  >
-                    <Star className={`w-4 h-4 mr-1.5 ${isFav ? "fill-yellow-400" : ""}`} />
-                    {isFav ? "Favoritado" : "Favoritar"}
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className={`w-full border-border bg-transparent ${isCurtido ? "text-red-400 border-red-400/40" : "text-white/60"}`}
-                    onClick={() => toggleCurtida.mutate({ obraId })}
-                  >
-                    <Heart className={`w-4 h-4 mr-1.5 ${isCurtido ? "fill-red-400" : ""}`} />
-                    {kk(curtidaCount)} curtidas
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  variant="outline"
-                  className="w-full border-border bg-transparent text-white/60"
-                  onClick={() => navigate("/login")}
-                >
-                  <Heart className="w-4 h-4 mr-1.5" />
-                  {kk(curtidaCount)} curtidas
-                </Button>
-              )}
-
-              {/* Botão editar — só admin_supremo */}
-              {isSupreme && (
-                <Button
-                  variant="outline"
-                  className="w-full border-border bg-transparent text-white/60 hover:text-white"
-                  onClick={abrirEdicao}
-                >
-                  <Pencil className="w-4 h-4 mr-1.5" />
-                  Editar Obra
-                </Button>
-              )}
-            </div>
-
-            {/* Stats */}
-            <div className="asc-card p-4 mt-4 space-y-2">
-              {andamentoInfo && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Status</span>
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${andamentoInfo.cls}`}>
-                    {andamentoInfo.label}
-                  </span>
-                </div>
-              )}
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Visualizações</span>
-                <span className="flex items-center gap-1 text-white/80">
-                  <Eye className="w-3.5 h-3.5" />{kk(obra.viewsTotal ?? 0)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Esta semana</span>
-                <span className="flex items-center gap-1 text-orange-400">
-                  <Flame className="w-3.5 h-3.5" />{kk(obra.viewsWeek ?? 0)}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Capítulos</span>
-                <span className="text-white/80">{capitulos.length}</span>
-              </div>
-              {obra.originalAuthor && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">Autor original</span>
-                  <span className="text-white/80 text-right max-w-[120px] truncate">{obra.originalAuthor}</span>
-                </div>
-              )}
-            </div>
+        {/* Sinopse */}
+        {sinopse && (
+          <div className="text-center mb-5">
+            <p className="text-sm text-white/60 leading-relaxed">
+              {sinopseCorta && !sinopseExpandida ? sinopse.slice(0, 180) + "..." : sinopse}
+            </p>
+            {sinopseCorta && (
+              <button onClick={() => setSinopseExpandida((p) => !p)}
+                className="text-xs text-primary hover:text-primary/80 mt-1 transition-colors">
+                {sinopseExpandida ? "Ver menos" : "Ver mais"}
+              </button>
+            )}
           </div>
+        )}
 
-          {/* Right: Details */}
-          <div className="lg:col-span-2 space-y-6">
+        {/* Gêneros */}
+        {genres.length > 0 && (
+          <div className="flex gap-1.5 flex-wrap justify-center mb-5">
+            {genres.map((g) => (
+              <span key={g} className="px-2.5 py-0.5 rounded-full text-xs border border-border text-white/60 bg-white/5">{g}</span>
+            ))}
+          </div>
+        )}
 
-            {/* Painel de edição */}
-            {editando && isSupreme && (
-              <div className="asc-card p-5 space-y-4 border-primary/30">
-                <div className="flex items-center justify-between">
-                  <h2 className="text-sm font-bold text-white uppercase tracking-wider">✏️ Editar Obra</h2>
-                  <button onClick={() => setEditando(false)} className="text-white/40 hover:text-white">
-                    <X className="w-4 h-4" />
-                  </button>
-                </div>
+        {/* Botões principais */}
+        <div className="flex gap-3 mb-6">
+          {capitulos.length > 0 && (
+            <Button className="flex-1 bg-white/10 hover:bg-primary border border-white/20 hover:border-primary text-white font-bold gap-2 transition-all"
+              onClick={() => navigate(`/obra/${obraId}/capitulo/${capitulos[0].id}`)}>
+              <BookOpen className="w-4 h-4" /> Começar a Ler
+            </Button>
+          )}
+          {isAuthenticated ? (
+            <Button variant="outline"
+              className={`flex-1 border-border bg-transparent font-bold gap-2 ${isFav ? "text-yellow-400 border-yellow-400/40" : "text-white/70"}`}
+              onClick={() => toggleFav.mutate({ obraId })}>
+              <Star className={`w-4 h-4 ${isFav ? "fill-yellow-400" : ""}`} />
+              {isFav ? "Favoritado" : "Favoritar"}
+            </Button>
+          ) : (
+            <Button variant="outline" className="flex-1 border-border bg-transparent text-white/70 font-bold gap-2"
+              onClick={() => navigate("/login")}>
+              <Star className="w-4 h-4" /> Favoritar
+            </Button>
+          )}
+        </div>
+
+        {/* Curtidas + Editar */}
+        <div className="flex gap-2 mb-8">
+          {isAuthenticated ? (
+            <Button variant="outline" size="sm"
+              className={`border-border bg-transparent ${isCurtido ? "text-red-400 border-red-400/40" : "text-white/50"}`}
+              onClick={() => toggleCurtida.mutate({ obraId })}>
+              <Heart className={`w-3.5 h-3.5 mr-1 ${isCurtido ? "fill-red-400" : ""}`} />
+              {kk(curtidaCount)}
+            </Button>
+          ) : (
+            <Button variant="outline" size="sm" className="border-border bg-transparent text-white/50"
+              onClick={() => navigate("/login")}>
+              <Heart className="w-3.5 h-3.5 mr-1" />{kk(curtidaCount)}
+            </Button>
+          )}
+          {obra.originalAuthor && (
+            <span className="text-xs text-muted-foreground self-center ml-1">por {obra.originalAuthor}</span>
+          )}
+          {isSupreme && (
+            <Button variant="outline" size="sm"
+              className="border-border bg-transparent text-white/50 hover:text-white ml-auto gap-1.5"
+              onClick={abrirEdicao}>
+              <Pencil className="w-3.5 h-3.5" /> Editar
+            </Button>
+          )}
+        </div>
+
+        {/* Painel de edição */}
+        {editando && isSupreme && (
+          <div className="asc-card p-5 mb-6 border-primary/20 space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-bold text-white">✏️ Editar Obra</h3>
+              <button onClick={() => setEditando(false)} className="text-white/40 hover:text-white"><X className="w-4 h-4" /></button>
+            </div>
+            {/* Preview da nova capa */}
+            {editCoverPreview && editCoverFile && (
+              <div className="flex items-center gap-3 p-3 bg-white/5 rounded-lg">
+                <img src={editCoverPreview} className="w-12 h-16 object-cover rounded" alt="nova capa" />
                 <div>
-                  <label className="text-xs text-white/60 mb-1 block">Título</label>
-                  <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)}
-                    className="bg-secondary border-border text-white" maxLength={255} />
-                </div>
-                <div>
-                  <label className="text-xs text-white/60 mb-1 block">Sinopse</label>
-                  <textarea value={editSynopsis} onChange={(e) => setEditSynopsis(e.target.value)}
-                    rows={3} maxLength={2000}
-                    className="w-full px-3 py-2 bg-secondary border border-border rounded-md text-white text-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary" />
-                </div>
-                <div>
-                  <label className="text-xs text-white/60 mb-1.5 block">Status</label>
-                  <div className="flex gap-2 flex-wrap">
-                    {(Object.entries(ANDAMENTO_CONFIG) as [keyof typeof ANDAMENTO_CONFIG, any][]).map(([val, cfg]) => (
-                      <button key={val} onClick={() => setEditAndamento(val)}
-                        className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
-                          editAndamento === val ? cfg.cls : "bg-transparent border-border text-white/50 hover:text-white"
-                        }`}>
-                        {cfg.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label className="text-xs text-white/60 mb-1.5 block">Gêneros (máx. 5)</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {GENRES_LIST.map((g) => (
-                      <button key={g} onClick={() => toggleEditGenre(g)}
-                        className={`px-2.5 py-1 rounded-full text-xs font-semibold border transition-colors ${
-                          editGenres.includes(g)
-                            ? "bg-primary border-primary text-white"
-                            : "bg-transparent border-border text-white/50 hover:text-white"
-                        }`}>
-                        {g}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button size="sm" className="bg-primary text-white" onClick={salvarEdicao} disabled={updateObra.isPending}>
-                    <Check className="w-3.5 h-3.5 mr-1" /> Salvar
-                  </Button>
-                  <Button size="sm" variant="ghost" className="text-white/60" onClick={() => setEditando(false)}>
-                    Cancelar
-                  </Button>
+                  <p className="text-xs text-white/60">Nova capa selecionada</p>
+                  <button onClick={() => { setEditCoverFile(null); setEditCoverPreview(obra.coverUrl ?? null); }}
+                    className="text-xs text-red-400 hover:text-red-300 mt-0.5">Remover</button>
                 </div>
               </div>
             )}
-
-            {/* Title & genres */}
             <div>
-              <h1 className="text-2xl font-black text-white mb-2">{obra.title}</h1>
-              <div className="flex gap-1.5 flex-wrap mb-3">
-                {andamentoInfo && (
-                  <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${andamentoInfo.cls}`}>
-                    {andamentoInfo.label}
-                  </span>
-                )}
-                {genres.map((g) => (
-                  <span key={g} className="asc-badge asc-badge-red">{g}</span>
+              <label className="text-xs text-white/50 mb-1 block">Título</label>
+              <Input value={editTitle} onChange={(e) => setEditTitle(e.target.value)} className="bg-secondary border-border text-white" maxLength={255} />
+            </div>
+            <div>
+              <label className="text-xs text-white/50 mb-1 block">Sinopse</label>
+              <textarea value={editSynopsis} onChange={(e) => setEditSynopsis(e.target.value)} rows={3} maxLength={2000}
+                className="w-full px-3 py-2 bg-secondary border border-border rounded-md text-white text-sm resize-none focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary" />
+            </div>
+            <div>
+              <label className="text-xs text-white/50 mb-1.5 block">Status</label>
+              <div className="flex gap-2 flex-wrap">
+                {(Object.entries(ANDAMENTO_CONFIG) as [keyof typeof ANDAMENTO_CONFIG, any][]).map(([val, cfg]) => (
+                  <button key={val} onClick={() => setEditAndamento(val)}
+                    className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${editAndamento === val ? cfg.cls : "border-border text-white/40 hover:text-white"}`}>
+                    {cfg.label}
+                  </button>
                 ))}
               </div>
-              {obra.synopsis && (
-                <p className="text-sm text-muted-foreground leading-relaxed">{obra.synopsis}</p>
-              )}
             </div>
-
-            {/* Chapters */}
-            <div className="asc-card p-4">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-sm font-bold text-white/80 uppercase tracking-wider flex items-center gap-2">
-                  <BookOpen className="w-4 h-4" />
-                  Capítulos ({capitulos.length})
-                </h2>
-                {isOwnerOrAdmin && (
-                  <Button size="sm" className="bg-primary hover:bg-primary/90 text-white text-xs"
-                    onClick={() => navigate(`/obra/${obraId}/novo-capitulo`)}>
-                    + Novo Capítulo
-                  </Button>
-                )}
+            <div>
+              <label className="text-xs text-white/50 mb-1.5 block">Gêneros (máx. 5)</label>
+              <div className="flex flex-wrap gap-1.5">
+                {GENRES_LIST.map((g) => (
+                  <button key={g} onClick={() => toggleEditGenre(g)}
+                    className={`px-2.5 py-0.5 rounded-full text-xs border transition-colors ${editGenres.includes(g) ? "bg-primary border-primary text-white" : "border-border text-white/40 hover:text-white"}`}>
+                    {g}
+                  </button>
+                ))}
               </div>
-              {capitulos.length === 0 ? (
-                <p className="text-muted-foreground text-sm">Nenhum capítulo disponível ainda.</p>
-              ) : (
-                <div className="space-y-1 max-h-80 overflow-y-auto pr-1">
-                  {capitulos.map((cap) => (
-                    <div key={cap.id}
-                      className="flex items-center justify-between p-2.5 rounded-lg hover:bg-white/5 cursor-pointer transition-colors group"
-                      onClick={() => navigate(`/obra/${obraId}/capitulo/${cap.id}`)}>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground w-8 text-right font-mono">{cap.numero}</span>
-                        <span className="text-sm text-white/80 group-hover:text-white transition-colors">
-                          {cap.title || `Capítulo ${cap.numero}`}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                        <Eye className="w-3 h-3" />{kk(cap.viewsTotal ?? 0)}
-                        <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100 transition-opacity" />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
-
-            {/* Comments */}
-            <div className="asc-card p-4">
-              <h2 className="text-sm font-bold text-white/80 uppercase tracking-wider mb-4 flex items-center gap-2">
-                <MessageSquare className="w-4 h-4" />
-                Comentários ({comentarios.length})
-              </h2>
-              {isAuthenticated ? (
-                <div className="mb-4 space-y-1">
-                  <div className="flex gap-2">
-                    <Textarea value={comment} onChange={(e) => setComment(e.target.value.slice(0, 500))}
-                      placeholder="Escreva um comentário..."
-                      className="bg-secondary border-border text-white placeholder:text-muted-foreground resize-none text-sm"
-                      rows={2} maxLength={500} />
-                    <Button size="icon" className="bg-primary hover:bg-primary/90 text-white flex-shrink-0 self-end"
-                      onClick={() => addComentario.mutate({ obraId, content: comment })}
-                      disabled={!comment.trim() || addComentario.isPending}>
-                      <Send className="w-4 h-4" />
-                    </Button>
-                  </div>
-                  <p className={`text-xs text-right ${comment.length >= 480 ? "text-yellow-400" : "text-muted-foreground"}`}>
-                    {comment.length}/500
-                  </p>
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground mb-4">
-                  <span className="text-primary cursor-pointer hover:underline" onClick={() => navigate("/login")}>
-                    Faça login
-                  </span>{" "}para comentar.
-                </p>
-              )}
-              <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
-                {comentarios.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">Seja o primeiro a comentar!</p>
-                ) : (
-                  comentarios.map((c: any) => (
-                    <div key={c.id} className="flex gap-3 group">
-                      <div className="w-7 h-7 rounded-full bg-primary/20 flex-shrink-0 flex items-center justify-center text-xs font-bold text-primary">
-                        {(c.autorId ?? "?").toString().slice(0, 1)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-xs text-muted-foreground mb-0.5">
-                          Usuário #{c.autorId} • {new Date(c.createdAt).toLocaleDateString("pt-BR")}
-                        </p>
-                        <p className="text-sm text-white/80">{c.content}</p>
-                      </div>
-                      {isAdmin && (
-                        <Button size="icon" variant="ghost"
-                          className="w-7 h-7 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 hover:bg-red-400/10"
-                          onClick={() => deleteComentario.mutate({ id: c.id })}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
-                      )}
-                    </div>
-                  ))
-                )}
-              </div>
+            <div className="flex gap-2">
+              <Button size="sm" className="bg-primary text-white" onClick={salvarEdicao} disabled={savingEdit}>
+                <Check className="w-3.5 h-3.5 mr-1" />{savingEdit ? "Salvando..." : "Salvar"}
+              </Button>
+              <Button size="sm" variant="ghost" className="text-white/50" onClick={() => setEditando(false)}>Cancelar</Button>
             </div>
           </div>
+        )}
+
+        {/* Abas */}
+        <div className="flex border-b border-border mb-5">
+          {[
+            { key: "capitulos", label: `Capítulos (${capitulos.length})`, icon: <BookOpen className="w-4 h-4" /> },
+            { key: "comentarios", label: `Comentários (${comentarios.length})`, icon: <MessageSquare className="w-4 h-4" /> },
+          ].map((tab) => (
+            <button key={tab.key} onClick={() => setActiveTab(tab.key as any)}
+              className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold border-b-2 transition-colors ${
+                activeTab === tab.key ? "border-primary text-white" : "border-transparent text-muted-foreground hover:text-white"
+              }`}>
+              {tab.icon}{tab.label}
+            </button>
+          ))}
         </div>
+
+        {/* Tab: Capítulos */}
+        {activeTab === "capitulos" && (
+          <div className="space-y-1">
+            {isOwnerOrAdmin && (
+              <div className="flex justify-end mb-3">
+                <Button size="sm" className="bg-primary hover:bg-primary/90 text-white text-xs"
+                  onClick={() => navigate(`/obra/${obraId}/novo-capitulo`)}>
+                  + Novo Capítulo
+                </Button>
+              </div>
+            )}
+            {capitulos.length === 0 ? (
+              <p className="text-muted-foreground text-sm text-center py-10">Nenhum capítulo disponível ainda.</p>
+            ) : (
+              <>
+                {capsPage.map((cap) => (
+                  <div key={cap.id}
+                    className="flex items-center justify-between px-3 py-3 rounded-lg hover:bg-white/5 cursor-pointer transition-colors group border border-transparent hover:border-border/50"
+                    onClick={() => navigate(`/obra/${obraId}/capitulo/${cap.id}`)}>
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs text-muted-foreground w-8 text-right font-mono">{cap.numero}</span>
+                      <span className="text-sm text-white/80 group-hover:text-white transition-colors">
+                        {cap.title || `Capítulo ${cap.numero}`}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Eye className="w-3 h-3" />{kk(cap.viewsTotal ?? 0)}
+                      <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100" />
+                    </div>
+                  </div>
+                ))}
+
+                {/* Paginação */}
+                {totalCapPages > 1 && (
+                  <div className="flex items-center justify-center gap-2 pt-4">
+                    <button onClick={() => setCapPage((p) => Math.max(0, p - 1))} disabled={capPage === 0}
+                      className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-white/50 hover:text-white hover:border-white/40 disabled:opacity-30 transition-colors">
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    {Array.from({ length: totalCapPages }, (_, i) => (
+                      <button key={i} onClick={() => setCapPage(i)}
+                        className={`w-8 h-8 rounded-full text-xs font-bold border transition-colors ${
+                          capPage === i ? "bg-primary border-primary text-white" : "border-border text-white/50 hover:text-white hover:border-white/40"
+                        }`}>
+                        {i + 1}
+                      </button>
+                    ))}
+                    <button onClick={() => setCapPage((p) => Math.min(totalCapPages - 1, p + 1))} disabled={capPage === totalCapPages - 1}
+                      className="w-8 h-8 rounded-full border border-border flex items-center justify-center text-white/50 hover:text-white hover:border-white/40 disabled:opacity-30 transition-colors">
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {/* Tab: Comentários */}
+        {activeTab === "comentarios" && (
+          <div className="space-y-5">
+            {/* Input de comentário */}
+            {isAuthenticated ? (
+              <div className="space-y-2">
+                {replyTo && (
+                  <div className="flex items-center gap-2 text-xs text-primary/70 bg-primary/5 border border-primary/20 rounded-lg px-3 py-2">
+                    <Reply className="w-3.5 h-3.5" />
+                    Respondendo @{replyTo.nome}
+                    <button onClick={() => setReplyTo(null)} className="ml-auto text-white/40 hover:text-white">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <Textarea
+                    id="comment-input"
+                    value={comment}
+                    onChange={(e) => setComment(e.target.value.slice(0, 500))}
+                    placeholder={replyTo ? `Respondendo @${replyTo.nome}...` : "Escreva um comentário..."}
+                    className="bg-secondary border-border text-white placeholder:text-muted-foreground resize-none text-sm"
+                    rows={2}
+                  />
+                  <Button size="icon"
+                    className="bg-primary hover:bg-primary/90 text-white flex-shrink-0 self-end"
+                    onClick={enviarComentario}
+                    disabled={!comment.trim() || addComentario.isPending}>
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </div>
+                <p className={`text-xs text-right ${comment.length >= 480 ? "text-yellow-400" : "text-muted-foreground"}`}>
+                  {comment.length}/500
+                </p>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                <span className="text-primary cursor-pointer hover:underline" onClick={() => navigate("/login")}>Faça login</span>{" "}para comentar.
+              </p>
+            )}
+
+            {/* Lista de comentários */}
+            <div className="space-y-4">
+              {comentariosRaiz.length === 0 ? (
+                <p className="text-muted-foreground text-sm text-center py-6">Seja o primeiro a comentar!</p>
+              ) : (
+                comentariosRaiz.map((c: any) => (
+                  <div key={c.id}>
+                    <Comentario
+                      c={c} isAdmin={isAdmin} userId={user?.id} obraId={obraId}
+                      onReply={handleReply}
+                      onDelete={(cid) => deleteComentario.mutate({ id: cid })}
+                    />
+                    {/* Respostas */}
+                    {respostasPor(c.id).length > 0 && (
+                      <div className="ml-11 mt-3 space-y-3 border-l-2 border-border/40 pl-4">
+                        {respostasPor(c.id).map((r: any) => (
+                          <Comentario key={r.id}
+                            c={r} isAdmin={isAdmin} userId={user?.id} obraId={obraId}
+                            onReply={handleReply}
+                            onDelete={(cid) => deleteComentario.mutate({ id: cid })}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
 }
-
