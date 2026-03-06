@@ -2,9 +2,6 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import crypto from "crypto";
 import { checkRateLimit, LIMITS } from "./rateLimit";
-
-
-
 import { protectedProcedure, publicProcedure, router } from "./trpc";
 import {
   avaliarPedidoCargo,
@@ -51,6 +48,7 @@ import {
   updateCapituloStatus,
   updateObraAuthor,
   updateObraStatus,
+  updateObra,
   updateUserProfile,
   updateUserRole,
   upsertHistoricoLeitura,
@@ -66,7 +64,6 @@ function isSupremeAdmin(role: string) { return role === "admin_supremo"; }
 function isTranslatorOrAbove(role: string) { return roleLevel(role) >= 1; }
 function isOfficialOrAbove(role: string) { return roleLevel(role) >= 2; }
 
-// ✅ Verifica se usuário pode interagir (banimento suave bloqueia interações)
 function canInteract(user: any) {
   if (user.bannedTotal) throw new TRPCError({ code: "FORBIDDEN", message: "Sua conta foi suspensa." });
   if (user.banned) throw new TRPCError({ code: "FORBIDDEN", message: "Você está impedido de interagir no momento." });
@@ -94,7 +91,6 @@ const obrasRouter = router({
   byId: publicProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
     const obra = await getObraById(input.id);
     if (!obra) throw new TRPCError({ code: "NOT_FOUND" });
-    // ✅ Obras não aprovadas só visíveis para o autor ou admin
     if (obra.status !== "aprovada") {
       const user = ctx.user;
       const isAuthor = user?.id === obra.authorId;
@@ -105,16 +101,45 @@ const obrasRouter = router({
   }),
 
   create: protectedProcedure
-    .input(z.object({ title: z.string().min(1), synopsis: z.string().optional(), genres: z.array(z.string()).optional(), coverUrl: z.string().optional(), originalAuthor: z.string().optional(), andamento: z.enum(["em_andamento", "iato", "finalizado"]).optional() }))
+    .input(z.object({
+      title: z.string().min(1),
+      synopsis: z.string().optional(),
+      genres: z.array(z.string()).optional(),
+      coverUrl: z.string().optional(),
+      originalAuthor: z.string().optional(),
+      andamento: z.enum(["em_andamento", "iato", "finalizado"]).optional(),
+    }))
     .mutation(async ({ ctx, input }) => {
       canInteract(ctx.user);
       if (!isTranslatorOrAbove(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Apenas tradutores podem criar obras." });
-      // ✅ Rate limit: 3 obras por dia
       const rl = checkRateLimit({ key: `criarObra:${ctx.user.id}`, ...LIMITS.criarObra });
       if (!rl.allowed) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `Limite de criação atingido. Tente em ${rl.retryAfterSec}s.` });
       const status = isOfficialOrAbove(ctx.user.role) ? "aprovada" : "em_espera";
-     await createObra({ title: input.title, synopsis: input.synopsis, genres: input.genres, coverUrl: input.coverUrl, originalAuthor: input.originalAuthor, authorId: ctx.user.id, status, andamento: input.andamento });
-      return { success: true, status };
+      const obra = await createObra({ title: input.title, synopsis: input.synopsis, genres: input.genres, coverUrl: input.coverUrl, originalAuthor: input.originalAuthor, authorId: ctx.user.id, status, andamento: input.andamento });
+      return { success: true, status, id: obra?.id };
+    }),
+
+  // ✅ Editar obra — só admin_supremo
+  update: protectedProcedure
+    .input(z.object({
+      id: z.number(),
+      title: z.string().min(1).optional(),
+      synopsis: z.string().optional(),
+      genres: z.array(z.string()).optional(),
+      andamento: z.enum(["em_andamento", "iato", "finalizado"]).optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      if (!isSupremeAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Apenas o Admin Supremo pode editar obras." });
+      const obra = await getObraById(input.id);
+      if (!obra) throw new TRPCError({ code: "NOT_FOUND" });
+      await updateObra(input.id, {
+        title: input.title,
+        synopsis: input.synopsis,
+        genres: input.genres,
+        andamento: input.andamento,
+      });
+      await logAdm({ adminId: ctx.user.id, acao: "editar_obra", targetType: "obra", targetId: input.id });
+      return { success: true };
     }),
 
   approve: protectedProcedure
@@ -129,7 +154,6 @@ const obrasRouter = router({
   changeAuthor: protectedProcedure
     .input(z.object({ obraId: z.number(), newAuthorId: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      // ✅ Só Admin Supremo pode transferir autoria de obra
       if (!isSupremeAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Apenas o Admin Supremo pode transferir autoria." });
       await updateObraAuthor(input.obraId, input.newAuthorId);
       await logAdm({ adminId: ctx.user.id, acao: "alterar_author_obra", detalhes: `Novo authorId: ${input.newAuthorId}`, targetType: "obra", targetId: input.obraId });
@@ -144,21 +168,28 @@ const obrasRouter = router({
     await incrementObraViews(input.id);
     return { skipped: false };
   }),
-  pending: protectedProcedure.query(({ ctx }) => { if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" }); return listPendingObras(); }),
-  minhas: protectedProcedure.query(({ ctx }) => { if (!isTranslatorOrAbove(ctx.user.role)) return []; return listObrasByAuthor(ctx.user.id); }),
+
+  pending: protectedProcedure.query(({ ctx }) => {
+    if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
+    return listPendingObras();
+  }),
+
+  minhas: protectedProcedure.query(({ ctx }) => {
+    if (!isTranslatorOrAbove(ctx.user.role)) return [];
+    return listObrasByAuthor(ctx.user.id);
+  }),
 });
 
 // ─── Capítulos Router ─────────────────────────────────────────────────────────
 const capitulosRouter = router({
-  // ✅ includeAll só para autor/admin — público vê apenas aprovados
   list: publicProcedure.input(z.object({ obraId: z.number(), includeAll: z.boolean().optional() })).query(({ ctx, input }) => {
     const podeVerTodos = input.includeAll && ctx.user && (isAdmin(ctx.user.role) || isTranslatorOrAbove(ctx.user.role));
     return listCapitulos(input.obraId, podeVerTodos ?? false);
   }),
+
   byId: publicProcedure.input(z.object({ id: z.number() })).query(async ({ ctx, input }) => {
     const cap = await getCapituloById(input.id);
     if (!cap) throw new TRPCError({ code: "NOT_FOUND" });
-    // ✅ Capítulos não aprovados só visíveis para o autor ou admin
     if (cap.status !== "aprovado") {
       const user = ctx.user;
       const isAuthor = user?.id === cap.authorId;
@@ -182,24 +213,14 @@ const capitulosRouter = router({
       const obra = await getObraById(input.obraId);
       if (!obra) throw new TRPCError({ code: "NOT_FOUND" });
       if (obra.authorId !== ctx.user.id && !isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Apenas o autor da obra pode adicionar capítulos." });
-      // ✅ Rate limit: 10 capítulos por hora
       const rl = checkRateLimit({ key: `criarCap:${ctx.user.id}`, ...LIMITS.criarCapitulo });
       if (!rl.allowed) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `Limite de capítulos atingido. Tente em ${rl.retryAfterSec}s.` });
-      // ✅ Limite de 10 capítulos aguardando para tradutor_aprendiz
       if (ctx.user.role === "tradutor_aprendiz") {
         const aguardando = await countCapitulosAguardando(ctx.user.id);
         if (aguardando >= 10) throw new TRPCError({ code: "FORBIDDEN", message: "Você já tem 10 capítulos aguardando aprovação. Aguarde antes de enviar mais." });
       }
       const status = isOfficialOrAbove(ctx.user.role) ? "aprovado" : "aguardando";
-      await createCapitulo({
-        obraId: input.obraId,
-        authorId: ctx.user.id,
-        numero: input.numero,
-        title: input.title,
-        paginas: JSON.stringify(input.paginas),
-        paginasKeys: JSON.stringify(input.paginasKeys),
-        status,
-      });
+      await createCapitulo({ obraId: input.obraId, authorId: ctx.user.id, numero: input.numero, title: input.title, paginas: JSON.stringify(input.paginas), paginasKeys: JSON.stringify(input.paginasKeys), status });
       return { success: true, status };
     }),
 
@@ -220,7 +241,11 @@ const capitulosRouter = router({
     await incrementCapituloViews(input.id);
     return { skipped: false };
   }),
-  pending: protectedProcedure.query(({ ctx }) => { if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" }); return listPendingCapitulos(); }),
+
+  pending: protectedProcedure.query(({ ctx }) => {
+    if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
+    return listPendingCapitulos();
+  }),
 });
 
 // ─── Comentários Router ───────────────────────────────────────────────────────
@@ -230,7 +255,6 @@ const comentariosRouter = router({
     .input(z.object({ obraId: z.number(), content: z.string().min(1).max(500) }))
     .mutation(async ({ ctx, input }) => {
       canInteract(ctx.user);
-      // ✅ Rate limit: 10 comentários por minuto
       const rl = checkRateLimit({ key: `comentario:${ctx.user.id}`, ...LIMITS.comentario });
       if (!rl.allowed) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `Muitos comentários. Aguarde ${rl.retryAfterSec}s.` });
       await createComentario({ obraId: input.obraId, autorId: ctx.user.id, content: input.content });
@@ -251,7 +275,7 @@ const curtidasRouter = router({
   count: publicProcedure.input(z.object({ obraId: z.number() })).query(({ input }) => countCurtidas(input.obraId)),
   status: protectedProcedure.input(z.object({ obraId: z.number() })).query(({ ctx, input }) => getCurtida(input.obraId, ctx.user.id).then((r) => !!r)),
   toggle: protectedProcedure.input(z.object({ obraId: z.number() })).mutation(({ ctx, input }) => {
-    canInteract(ctx.user); // ✅ banimento suave bloqueia curtidas
+    canInteract(ctx.user);
     return toggleCurtida(input.obraId, ctx.user.id);
   }),
 });
@@ -261,7 +285,7 @@ const favoritosRouter = router({
   list: protectedProcedure.query(({ ctx }) => listFavoritos(ctx.user.id)),
   status: protectedProcedure.input(z.object({ obraId: z.number() })).query(({ ctx, input }) => getFavorito(ctx.user.id, input.obraId).then((r) => !!r)),
   toggle: protectedProcedure.input(z.object({ obraId: z.number() })).mutation(({ ctx, input }) => {
-    canInteract(ctx.user); // ✅ banimento suave bloqueia favoritos
+    canInteract(ctx.user);
     return toggleFavorito(ctx.user.id, input.obraId);
   }),
 });
@@ -280,7 +304,6 @@ const reportsRouter = router({
     .input(z.object({ capituloId: z.number(), obraId: z.number(), tipo: z.enum(["imagem_faltando", "cap_nao_carrega", "erro_traducao", "outro"]), descricao: z.string().max(1000).optional() }))
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.bannedTotal) throw new TRPCError({ code: "FORBIDDEN" });
-      // ✅ Rate limit: 3 denúncias por hora
       const rl = checkRateLimit({ key: `denuncia:${ctx.user.id}`, ...LIMITS.denuncia });
       if (!rl.allowed) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `Limite de denúncias atingido. Aguarde ${rl.retryAfterSec}s.` });
       await createReport({ capituloId: input.capituloId, obraId: input.obraId, userId: ctx.user.id, tipo: input.tipo, descricao: input.descricao });
@@ -295,8 +318,6 @@ const pedidoCargoRouter = router({
     .mutation(async ({ ctx, input }) => {
       if (ctx.user.role !== "usuario") throw new TRPCError({ code: "FORBIDDEN", message: "Apenas usuários comuns podem solicitar cargo." });
       if (ctx.user.bannedTotal || ctx.user.banned) throw new TRPCError({ code: "FORBIDDEN", message: "Sua conta está suspensa." });
-
-      // Verifica cooldown de 10 dias
       if (ctx.user.ultimoPedidoCargo) {
         const diasPassados = (Date.now() - new Date(ctx.user.ultimoPedidoCargo).getTime()) / (1000 * 60 * 60 * 24);
         if (diasPassados < 10) {
@@ -304,11 +325,9 @@ const pedidoCargoRouter = router({
           throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `Aguarde ${diasRestantes} dia(s) antes de fazer um novo pedido.` });
         }
       }
-
       await criarPedidoCargo({ userId: ctx.user.id, tipo: input.tipo, mensagem: input.mensagem });
       return { success: true };
     }),
-
   meuPedidoRecente: protectedProcedure.query(async ({ ctx }) => {
     const pedidos = await listPedidosCargo(1, "pendente");
     const meu = pedidos.find((p: any) => p.userId === ctx.user.id);
@@ -341,12 +360,10 @@ const adminRouter = router({
       if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
       return listUsers(input.page ?? 1, 30, input.search, input.role);
     }),
-
   setRole: protectedProcedure
     .input(z.object({ userId: z.number(), role: z.enum(["usuario", "tradutor_aprendiz", "tradutor_oficial", "criador", "admin_senhor", "admin_supremo"]) }))
     .mutation(async ({ ctx, input }) => {
       if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
-      // ✅ Não pode promover a si mesmo
       if (input.userId === ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "Você não pode alterar seu próprio cargo." });
       if (!isSupremeAdmin(ctx.user.role) && (input.role === "admin_senhor" || input.role === "admin_supremo")) throw new TRPCError({ code: "FORBIDDEN", message: "Apenas Admin Supremo pode promover a Admin." });
       if (input.role === "admin_supremo") throw new TRPCError({ code: "FORBIDDEN", message: "O cargo de Admin Supremo não pode ser atribuído por aqui." });
@@ -354,54 +371,46 @@ const adminRouter = router({
       await logAdm({ adminId: ctx.user.id, acao: "alterar_role", detalhes: `Novo role: ${input.role}`, targetType: "usuario", targetId: input.userId });
       return { success: true };
     }),
-
   banUser: protectedProcedure
     .input(z.object({ userId: z.number(), banned: z.boolean(), total: z.boolean().optional() }))
     .mutation(async ({ ctx, input }) => {
       if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
-      // ✅ Não pode banir a si mesmo
       if (input.userId === ctx.user.id) throw new TRPCError({ code: "FORBIDDEN", message: "Você não pode banir a si mesmo." });
-      // ✅ Não pode banir Admin Supremo
       const alvo = await getUserById(input.userId);
       if (alvo && isSupremeAdmin(alvo.role)) throw new TRPCError({ code: "FORBIDDEN", message: "O Admin Supremo não pode ser banido." });
+      // ✅ admin_senhor só pode banir suave
+      if (!isSupremeAdmin(ctx.user.role) && input.total) throw new TRPCError({ code: "FORBIDDEN", message: "Apenas o Admin Supremo pode aplicar banimento total." });
       await banUser(input.userId, input.banned, input.total ?? false);
       await logAdm({ adminId: ctx.user.id, acao: input.banned ? (input.total ? "banir_total" : "banir_suave") : "desbanir_usuario", targetType: "usuario", targetId: input.userId });
       return { success: true };
     }),
-
   logs: protectedProcedure.input(z.object({ page: z.number().optional() })).query(({ ctx, input }) => {
     if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
     return listHistoricoAdm(input.page ?? 1);
   }),
-
   stats: protectedProcedure.query(({ ctx }) => {
     if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
     return getPlatformStats();
   }),
-
   setPublicLink: protectedProcedure
     .input(z.object({ key: z.string(), value: z.string() }))
     .mutation(async ({ ctx, input }) => {
-      // ✅ Só Admin Supremo pode editar links públicos (Discord, Telegram, etc)
       if (!isSupremeAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Apenas o Admin Supremo pode editar links públicos." });
       await setPublicLink(input.key, input.value);
       return { success: true };
     }),
-
   getPublicLink: publicProcedure
     .input(z.object({ key: z.string() }))
     .query(async ({ input }) => {
       const result = await getPublicLink(input.key);
       return result ?? null;
     }),
-
   listReports: protectedProcedure
     .input(z.object({ page: z.number().optional(), resolved: z.boolean().optional() }))
     .query(({ ctx, input }) => {
       if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
       return listReports(input.page ?? 1, 30, input.resolved);
     }),
-
   resolveReport: protectedProcedure
     .input(z.object({ reportId: z.number(), resolved: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
@@ -409,15 +418,12 @@ const adminRouter = router({
       await resolveReport(input.reportId, input.resolved);
       return { success: true };
     }),
-
-  // ✅ Pedidos de cargo no painel admin
   listPedidosCargo: protectedProcedure
     .input(z.object({ page: z.number().optional(), status: z.enum(["pendente", "aprovado", "rejeitado"]).optional() }))
     .query(({ ctx, input }) => {
       if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
       return listPedidosCargo(input.page ?? 1, input.status);
     }),
-
   avaliarPedidoCargo: protectedProcedure
     .input(z.object({ pedidoId: z.number(), status: z.enum(["aprovado", "rejeitado"]), resposta: z.string().max(500).optional() }))
     .mutation(async ({ ctx, input }) => {
@@ -430,10 +436,8 @@ const adminRouter = router({
 
 // ─── App Router ───────────────────────────────────────────────────────────────
 export const appRouter = router({
-  
   auth: router({
     me: publicProcedure.query((opts) => opts.ctx.user),
-    // ✅ Logout unificado — invalida sessão no banco E limpa cookie
     logout: publicProcedure.mutation(async ({ ctx }) => {
       const sessionId = ctx.req.cookies?.["asc_session"];
       if (sessionId && typeof sessionId === "string" && sessionId.length === 64) {
@@ -466,4 +470,3 @@ export const appRouter = router({
 });
 
 export type AppRouter = typeof appRouter;
-
