@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
   Search, ChevronLeft, ChevronRight, ChevronDown,
-  Flame, Clock, Eye, Loader2, BookOpen,
+  Flame, Clock, Eye, Loader2, BookOpen, Play, X, Swords,
 } from "lucide-react";
 import { useDebounce } from "@/hooks/useDebounce";
 
@@ -19,6 +19,8 @@ const GENRES = [
 const CAROUSEL_SIZE = 20;
 const INITIAL_RECENT = 12;
 const LOAD_MORE = 12;
+const HERO_INTERVAL = 5000;
+const BANNER_INTERVAL_MS = 60 * 60 * 1000; // 1 hora
 
 function isNovo(dateStr: string | Date) {
   return Date.now() - new Date(dateStr).getTime() < 24 * 60 * 60 * 1000;
@@ -34,6 +36,125 @@ function parseGenres(genres?: string | null): string[] {
   }
 }
 
+// ─── Banner "Onde leitores se tornam tradutores" ──────────────────────────────
+function AscenderBanner({ onClose }: { onClose: () => void }) {
+  const [, navigate] = useLocation();
+  return (
+    <div className="relative overflow-hidden rounded-xl border border-primary/30 bg-gradient-to-r from-black via-primary/10 to-black p-6 mb-2">
+      <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent pointer-events-none" />
+      <button
+        onClick={onClose}
+        className="absolute top-3 right-3 text-white/40 hover:text-white transition-colors"
+      >
+        <X className="w-4 h-4" />
+      </button>
+      <div className="flex items-center gap-4">
+        <div className="w-12 h-12 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center flex-shrink-0">
+          <Swords className="w-6 h-6 text-primary" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs text-primary font-bold uppercase tracking-widest mb-0.5">ASCENDER</p>
+          <h3 className="text-white font-black text-lg leading-tight">Onde leitores se tornam tradutores</h3>
+          <p className="text-white/50 text-xs mt-0.5">Junte-se à comunidade e contribua com traduções</p>
+        </div>
+        <Button
+          size="sm"
+          className="bg-primary hover:bg-primary/90 text-white font-bold flex-shrink-0"
+          onClick={() => navigate("/perfil")}
+        >
+          Começar
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Hero Banner ──────────────────────────────────────────────────────────────
+function HeroBanner({ obras, onObraClick }: { obras: any[]; onObraClick: (id: number) => void }) {
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    if (obras.length <= 1) return;
+    const t = setInterval(() => setIdx((i) => (i + 1) % obras.length), HERO_INTERVAL);
+    return () => clearInterval(t);
+  }, [obras.length]);
+
+  if (obras.length === 0) return null;
+
+  const obra = obras[idx];
+  const genres = parseGenres(obra.genres);
+
+  return (
+    <div className="relative w-full overflow-hidden rounded-xl" style={{ minHeight: 280 }}>
+      {/* Background image */}
+      <div className="absolute inset-0">
+        {obra.coverUrl ? (
+          <img src={obra.coverUrl} alt="" className="w-full h-full object-cover object-center scale-110 blur-sm opacity-40" />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-primary/20 to-black" />
+        )}
+        <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+      </div>
+
+      {/* Content */}
+      <div className="relative z-10 flex items-center gap-5 p-5 sm:p-8" style={{ minHeight: 280 }}>
+        {/* Cover */}
+        <div className="flex-shrink-0 w-28 sm:w-36 aspect-[3/4] rounded-lg overflow-hidden border-2 border-white/20 shadow-2xl">
+          {obra.coverUrl ? (
+            <img src={obra.coverUrl} alt={obra.title} className="w-full h-full object-cover" />
+          ) : (
+            <div className="w-full h-full bg-secondary flex items-center justify-center">
+              <BookOpen className="w-8 h-8 text-primary/50" />
+            </div>
+          )}
+        </div>
+
+        {/* Info */}
+        <div className="flex-1 min-w-0">
+          {genres[0] && (
+            <span className="inline-block bg-primary text-white text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider mb-2">
+              {genres[0]}
+            </span>
+          )}
+          <h2 className="text-white font-black text-xl sm:text-2xl leading-tight mb-2 line-clamp-2">
+            {obra.title}
+          </h2>
+          {obra.synopsis && (
+            <p className="text-white/60 text-xs sm:text-sm leading-relaxed line-clamp-2 mb-3">
+              {obra.synopsis}
+            </p>
+          )}
+          <div className="flex items-center gap-3 text-xs text-white/50 mb-4">
+            <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{obra.viewsTotal?.toLocaleString() ?? 0}</span>
+          </div>
+          <Button
+            className="bg-white/20 hover:bg-primary border border-white/30 text-white font-bold gap-2 backdrop-blur-sm transition-all"
+            onClick={() => onObraClick(obra.id)}
+          >
+            <Play className="w-4 h-4 fill-white" />
+            LER AGORA
+          </Button>
+        </div>
+      </div>
+
+      {/* Dots */}
+      {obras.length > 1 && (
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+          {obras.slice(0, 6).map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setIdx(i)}
+              className={`h-1.5 rounded-full transition-all ${i === idx ? "w-6 bg-primary" : "w-1.5 bg-white/30"}`}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Card de obra ─────────────────────────────────────────────────────────────
 function ObraCard({ obra, onClick }: { obra: any; onClick: () => void }) {
   const caps = obra.ultimosCapitulos ?? [];
   const genres = parseGenres(obra.genres);
@@ -87,6 +208,7 @@ function ObraCard({ obra, onClick }: { obra: any; onClick: () => void }) {
   );
 }
 
+// ─── Carrossel horizontal ─────────────────────────────────────────────────────
 function Carrossel({ obras, titulo, icone, onObraClick }: {
   obras: any[];
   titulo: string;
@@ -139,6 +261,7 @@ function Carrossel({ obras, titulo, icone, onObraClick }: {
   );
 }
 
+// ─── Página principal ─────────────────────────────────────────────────────────
 export default function Home() {
   const [, navigate] = useLocation();
   const { user, isAuthenticated } = useAuth();
@@ -146,9 +269,23 @@ export default function Home() {
   const [genre, setGenre] = useState<string | undefined>();
   const [recentLimit, setRecentLimit] = useState(INITIAL_RECENT);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [showBanner, setShowBanner] = useState(false);
   const debouncedSearch = useDebounce(search, 350);
 
   const isTranslator = isAuthenticated && user?.role !== "usuario";
+
+  // Mostrar banner a cada 1 hora
+  useEffect(() => {
+    const lastSeen = parseInt(localStorage.getItem("asc_banner_seen") ?? "0");
+    if (Date.now() - lastSeen > BANNER_INTERVAL_MS) {
+      setShowBanner(true);
+    }
+  }, []);
+
+  function closeBanner() {
+    localStorage.setItem("asc_banner_seen", String(Date.now()));
+    setShowBanner(false);
+  }
 
   const { data: hotObras = [] } = trpc.obras.list.useQuery({ sort: "hot", limit: CAROUSEL_SIZE });
   const { data: mostObras = [] } = trpc.obras.list.useQuery({ sort: "most", limit: CAROUSEL_SIZE });
@@ -175,7 +312,16 @@ export default function Home() {
   return (
     <div className="min-h-screen">
       <Topbar />
-      <main className="container py-6 space-y-10">
+      <main className="container py-6 space-y-8">
+
+        {/* Hero Banner — só sem busca ativa */}
+        {!buscando && hotObras.length > 0 && (
+          <HeroBanner obras={hotObras.slice(0, 6)} onObraClick={goObra} />
+        )}
+
+        {/* Banner ASCENDER */}
+        {!buscando && showBanner && <AscenderBanner onClose={closeBanner} />}
+
         {/* Busca + gêneros */}
         <div className="space-y-3">
           <div className="relative">
@@ -204,10 +350,9 @@ export default function Home() {
           </div>
         </div>
 
-        {/* Carrosséis — só aparecem sem busca ativa */}
+        {/* Carrosséis — só sem busca ativa */}
         {!buscando && (
           <>
-            {/* Minhas Obras — só para tradutores */}
             {isTranslator && minhasObras.length > 0 && (
               <Carrossel
                 obras={minhasObras}
