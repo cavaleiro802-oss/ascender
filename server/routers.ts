@@ -105,7 +105,7 @@ const obrasRouter = router({
   }),
 
   create: protectedProcedure
-    .input(z.object({ title: z.string().min(1), synopsis: z.string().optional(), genres: z.array(z.string()).optional(), coverUrl: z.string().optional(), originalAuthor: z.string().optional() }))
+    .input(z.object({ title: z.string().min(1), synopsis: z.string().optional(), genres: z.array(z.string()).optional(), coverUrl: z.string().optional(), originalAuthor: z.string().optional(), andamento: z.enum(["em_andamento", "iato", "finalizado"]).optional() }))
     .mutation(async ({ ctx, input }) => {
       canInteract(ctx.user);
       if (!isTranslatorOrAbove(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Apenas tradutores podem criar obras." });
