@@ -224,6 +224,21 @@ export async function listObrasByAuthor(authorId: number) {
   return db.select().from(obras).where(eq(obras.authorId, authorId)).orderBy(desc(obras.updatedAt)).limit(50);
 }
 
+export async function updateObra(obraId: number, data: {
+  title?: string;
+  synopsis?: string;
+  genres?: string[];
+  andamento?: "em_andamento" | "iato" | "finalizado";
+}) {
+  const db = await getDb();
+  if (!db) return;
+  const set: Record<string, unknown> = { updatedAt: new Date() };
+  if (data.title !== undefined) set.title = data.title;
+  if (data.synopsis !== undefined) set.synopsis = data.synopsis || null;
+  if (data.genres !== undefined) set.genres = JSON.stringify(data.genres);
+  if (data.andamento !== undefined) set.andamento = data.andamento;
+  await db.update(obras).set(set as any).where(eq(obras.id, obraId));
+}
 export async function getObraById(id: number) {
   const db = await getDb();
   if (!db) return undefined;
