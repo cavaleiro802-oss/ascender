@@ -22,6 +22,40 @@ const LOAD_MORE = 12;
 const HERO_INTERVAL = 5000;
 const BANNER_INTERVAL_MS = 60 * 60 * 1000;
 
+// ─── Sistema de propagandas rotativas ────────────────────────────────────────
+const PROPAGANDAS = [
+  {
+    id: "tradutor",
+    icon: "⚔",
+    tag: "ASCENDER",
+    titulo: "Onde leitores se tornam tradutores",
+    subtitulo: "Junte-se à comunidade e contribua com traduções",
+    btnLabel: "Quero ser Tradutor",
+    rota: "/pedido-cargo",
+    gradient: "from-[#0d0010] via-[#110016] to-[#0a000d]",
+    glow1: "bg-primary/10",
+    glow2: "bg-purple-500/10",
+    border: "border-primary/20",
+    btnCls: "from-primary to-purple-600 hover:from-primary/90 hover:to-purple-700 shadow-primary/30",
+    dot: "bg-primary",
+  },
+  {
+    id: "loja",
+    icon: "🛍",
+    tag: "EM BREVE",
+    titulo: "Cosméticos e molduras exclusivas",
+    subtitulo: "Personalize seu perfil com itens únicos da loja",
+    btnLabel: "Ver Loja",
+    rota: null, // desabilitado até lançar
+    gradient: "from-[#000d10] via-[#001116] to-[#00080d]",
+    glow1: "bg-blue-500/10",
+    glow2: "bg-cyan-500/10",
+    border: "border-blue-500/20",
+    btnCls: "from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700 shadow-blue-500/30",
+    dot: "bg-blue-400",
+  },
+];
+
 function isNovo(dateStr: string | Date) {
   return Date.now() - new Date(dateStr).getTime() < 24 * 60 * 60 * 1000;
 }
@@ -34,55 +68,54 @@ function parseGenres(genres?: string | null): string[] {
   } catch { return []; }
 }
 
-// ─── Banner ASCENDER ──────────────────────────────────────────────────────────
-function AscenderBanner({ onClose }: { onClose: () => void }) {
+// ─── Propaganda rotativa ─────────────────────────────────────────────────────
+function PropagandaBanner({ onClose }: { onClose: () => void }) {
   const [, navigate] = useLocation();
-  return (
-    <div className="relative overflow-hidden rounded-2xl border border-primary/20 p-[1px]">
-      {/* Borda gradiente animada */}
-      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary/40 via-purple-500/30 to-primary/40 opacity-60" />
-      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-[#0d0010] via-[#110016] to-[#0a000d] p-5 sm:p-7">
-        {/* Glow de fundo */}
-        <div className="absolute top-0 left-1/4 w-64 h-32 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
-        <div className="absolute bottom-0 right-1/4 w-48 h-24 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+  const [idx, setIdx] = useState(0);
+  const p = PROPAGANDAS[idx];
 
-        <button
-          onClick={onClose}
-          className="absolute top-3 right-3 text-white/30 hover:text-white transition-colors z-10"
-        >
+  return (
+    <div className={`relative overflow-hidden rounded-2xl border ${p.border} p-[1px]`}>
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-white/5 via-white/10 to-white/5 opacity-40" />
+      <div className={`relative rounded-2xl overflow-hidden bg-gradient-to-br ${p.gradient} p-5 sm:p-7`}>
+        <div className={`absolute top-0 left-1/4 w-64 h-32 ${p.glow1} rounded-full blur-3xl pointer-events-none`} />
+        <div className={`absolute bottom-0 right-1/4 w-48 h-24 ${p.glow2} rounded-full blur-3xl pointer-events-none`} />
+
+        <button onClick={onClose} className="absolute top-3 right-3 text-white/30 hover:text-white transition-colors z-10">
           <X className="w-4 h-4" />
         </button>
 
         <div className="flex items-center gap-5 relative z-10">
-          {/* Ícone */}
           <div className="relative flex-shrink-0">
-            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-primary/30 to-purple-600/30 border border-primary/30 flex items-center justify-center shadow-lg shadow-primary/20">
-              <Swords className="w-7 h-7 sm:w-8 sm:h-8 text-primary" />
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-lg text-2xl sm:text-3xl">
+              {p.icon}
             </div>
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full animate-pulse" />
+            <div className={`absolute -top-1 -right-1 w-3 h-3 ${p.dot} rounded-full animate-pulse`} />
           </div>
-
-          {/* Texto */}
           <div className="flex-1 min-w-0">
-            <p className="text-[10px] sm:text-xs text-primary/80 font-bold uppercase tracking-[0.2em] mb-1">
-              ⚔ ASCENDER
-            </p>
-            <h3 className="text-white font-black text-base sm:text-xl leading-tight mb-1">
-              Onde leitores se tornam tradutores
-            </h3>
-            <p className="text-white/40 text-xs hidden sm:block">
-              Junte-se à comunidade e contribua com traduções
-            </p>
+            <p className="text-[10px] sm:text-xs text-white/50 font-bold uppercase tracking-[0.2em] mb-1">{p.tag}</p>
+            <h3 className="text-white font-black text-base sm:text-xl leading-tight mb-1">{p.titulo}</h3>
+            <p className="text-white/40 text-xs hidden sm:block">{p.subtitulo}</p>
           </div>
-
-          {/* Botão */}
-          <Button
-            size="sm"
-            className="bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-700 text-white font-bold flex-shrink-0 shadow-lg shadow-primary/30 border-0 px-4 sm:px-6"
-            onClick={() => navigate("/perfil")}
-          >
-            Começar
-          </Button>
+          <div className="flex flex-col items-end gap-2 flex-shrink-0">
+            <Button
+              size="sm"
+              disabled={!p.rota}
+              className={`bg-gradient-to-r ${p.btnCls} text-white font-bold shadow-lg border-0 px-4 sm:px-5 ${!p.rota ? "opacity-60 cursor-not-allowed" : ""}`}
+              onClick={() => p.rota && navigate(p.rota)}
+            >
+              {p.btnLabel}
+            </Button>
+            {/* Dots para trocar propaganda */}
+            {PROPAGANDAS.length > 1 && (
+              <div className="flex gap-1.5">
+                {PROPAGANDAS.map((_, i) => (
+                  <button key={i} onClick={() => setIdx(i)}
+                    className={`h-1.5 rounded-full transition-all ${i === idx ? "w-4 bg-white/60" : "w-1.5 bg-white/20"}`} />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -373,7 +406,7 @@ export default function Home() {
             {hotObras.length > 0 && <HeroBanner obras={hotObras.slice(0, 6)} onObraClick={goObra} />}
 
             {/* Banner ASCENDER */}
-            {showBanner && <AscenderBanner onClose={closeBanner} />}
+            {showBanner && <PropagandaBanner onClose={closeBanner} />}
 
             {/* Carrosséis */}
             {isTranslator && minhasObras.length > 0 && (
