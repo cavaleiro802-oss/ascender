@@ -20,7 +20,7 @@ const CAROUSEL_SIZE = 20;
 const INITIAL_RECENT = 12;
 const LOAD_MORE = 12;
 const HERO_INTERVAL = 5000;
-const BANNER_INTERVAL_MS = 60 * 60 * 1000; // 1 hora
+const BANNER_INTERVAL_MS = 60 * 60 * 1000;
 
 function isNovo(dateStr: string | Date) {
   return Date.now() - new Date(dateStr).getTime() < 24 * 60 * 60 * 1000;
@@ -31,39 +31,59 @@ function parseGenres(genres?: string | null): string[] {
   try {
     const parsed = JSON.parse(genres);
     return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
 
-// ─── Banner "Onde leitores se tornam tradutores" ──────────────────────────────
+// ─── Banner ASCENDER ──────────────────────────────────────────────────────────
 function AscenderBanner({ onClose }: { onClose: () => void }) {
   const [, navigate] = useLocation();
   return (
-    <div className="relative overflow-hidden rounded-xl border border-primary/30 bg-gradient-to-r from-black via-primary/10 to-black p-6 mb-2">
-      <div className="absolute inset-0 bg-gradient-to-r from-primary/5 to-transparent pointer-events-none" />
-      <button
-        onClick={onClose}
-        className="absolute top-3 right-3 text-white/40 hover:text-white transition-colors"
-      >
-        <X className="w-4 h-4" />
-      </button>
-      <div className="flex items-center gap-4">
-        <div className="w-12 h-12 rounded-xl bg-primary/20 border border-primary/30 flex items-center justify-center flex-shrink-0">
-          <Swords className="w-6 h-6 text-primary" />
-        </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-xs text-primary font-bold uppercase tracking-widest mb-0.5">ASCENDER</p>
-          <h3 className="text-white font-black text-lg leading-tight">Onde leitores se tornam tradutores</h3>
-          <p className="text-white/50 text-xs mt-0.5">Junte-se à comunidade e contribua com traduções</p>
-        </div>
-        <Button
-          size="sm"
-          className="bg-primary hover:bg-primary/90 text-white font-bold flex-shrink-0"
-          onClick={() => navigate("/perfil")}
+    <div className="relative overflow-hidden rounded-2xl border border-primary/20 p-[1px]">
+      {/* Borda gradiente animada */}
+      <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-primary/40 via-purple-500/30 to-primary/40 opacity-60" />
+      <div className="relative rounded-2xl overflow-hidden bg-gradient-to-br from-[#0d0010] via-[#110016] to-[#0a000d] p-5 sm:p-7">
+        {/* Glow de fundo */}
+        <div className="absolute top-0 left-1/4 w-64 h-32 bg-primary/10 rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute bottom-0 right-1/4 w-48 h-24 bg-purple-500/10 rounded-full blur-3xl pointer-events-none" />
+
+        <button
+          onClick={onClose}
+          className="absolute top-3 right-3 text-white/30 hover:text-white transition-colors z-10"
         >
-          Começar
-        </Button>
+          <X className="w-4 h-4" />
+        </button>
+
+        <div className="flex items-center gap-5 relative z-10">
+          {/* Ícone */}
+          <div className="relative flex-shrink-0">
+            <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-gradient-to-br from-primary/30 to-purple-600/30 border border-primary/30 flex items-center justify-center shadow-lg shadow-primary/20">
+              <Swords className="w-7 h-7 sm:w-8 sm:h-8 text-primary" />
+            </div>
+            <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full animate-pulse" />
+          </div>
+
+          {/* Texto */}
+          <div className="flex-1 min-w-0">
+            <p className="text-[10px] sm:text-xs text-primary/80 font-bold uppercase tracking-[0.2em] mb-1">
+              ⚔ ASCENDER
+            </p>
+            <h3 className="text-white font-black text-base sm:text-xl leading-tight mb-1">
+              Onde leitores se tornam tradutores
+            </h3>
+            <p className="text-white/40 text-xs hidden sm:block">
+              Junte-se à comunidade e contribua com traduções
+            </p>
+          </div>
+
+          {/* Botão */}
+          <Button
+            size="sm"
+            className="bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-700 text-white font-bold flex-shrink-0 shadow-lg shadow-primary/30 border-0 px-4 sm:px-6"
+            onClick={() => navigate("/perfil")}
+          >
+            Começar
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -80,27 +100,26 @@ function HeroBanner({ obras, onObraClick }: { obras: any[]; onObraClick: (id: nu
   }, [obras.length]);
 
   if (obras.length === 0) return null;
-
   const obra = obras[idx];
   const genres = parseGenres(obra.genres);
 
   return (
-    <div className="relative w-full overflow-hidden rounded-xl" style={{ minHeight: 280 }}>
-      {/* Background image */}
+    <div className="relative w-full overflow-hidden rounded-2xl" style={{ minHeight: 300 }}>
+      {/* BG blur */}
       <div className="absolute inset-0">
         {obra.coverUrl ? (
-          <img src={obra.coverUrl} alt="" className="w-full h-full object-cover object-center scale-110 blur-sm opacity-40" />
+          <img src={obra.coverUrl} alt="" className="w-full h-full object-cover object-top scale-110 blur-md opacity-30" />
         ) : (
           <div className="w-full h-full bg-gradient-to-br from-primary/20 to-black" />
         )}
-        <div className="absolute inset-0 bg-gradient-to-r from-black/90 via-black/60 to-transparent" />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
+        <div className="absolute inset-0 bg-gradient-to-r from-black/95 via-black/70 to-black/20" />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-transparent to-black/20" />
       </div>
 
       {/* Content */}
-      <div className="relative z-10 flex items-center gap-5 p-5 sm:p-8" style={{ minHeight: 280 }}>
+      <div className="relative z-10 flex items-center gap-6 sm:gap-10 p-6 sm:p-10 lg:p-14" style={{ minHeight: 300 }}>
         {/* Cover */}
-        <div className="flex-shrink-0 w-28 sm:w-36 aspect-[3/4] rounded-lg overflow-hidden border-2 border-white/20 shadow-2xl">
+        <div className="flex-shrink-0 w-28 sm:w-40 lg:w-48 aspect-[3/4] rounded-xl overflow-hidden border-2 border-white/10 shadow-2xl shadow-black/60">
           {obra.coverUrl ? (
             <img src={obra.coverUrl} alt={obra.title} className="w-full h-full object-cover" />
           ) : (
@@ -111,25 +130,25 @@ function HeroBanner({ obras, onObraClick }: { obras: any[]; onObraClick: (id: nu
         </div>
 
         {/* Info */}
-        <div className="flex-1 min-w-0">
+        <div className="flex-1 min-w-0 max-w-xl">
           {genres[0] && (
-            <span className="inline-block bg-primary text-white text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-wider mb-2">
+            <span className="inline-block bg-primary text-white text-[10px] font-black px-3 py-1 rounded-full uppercase tracking-widest mb-3 shadow-lg shadow-primary/30">
               {genres[0]}
             </span>
           )}
-          <h2 className="text-white font-black text-xl sm:text-2xl leading-tight mb-2 line-clamp-2">
+          <h2 className="text-white font-black text-2xl sm:text-3xl lg:text-4xl leading-tight mb-3 line-clamp-2 drop-shadow-lg">
             {obra.title}
           </h2>
           {obra.synopsis && (
-            <p className="text-white/60 text-xs sm:text-sm leading-relaxed line-clamp-2 mb-3">
+            <p className="text-white/50 text-sm leading-relaxed line-clamp-2 mb-4 hidden sm:block">
               {obra.synopsis}
             </p>
           )}
-          <div className="flex items-center gap-3 text-xs text-white/50 mb-4">
-            <span className="flex items-center gap-1"><Eye className="w-3 h-3" />{obra.viewsTotal?.toLocaleString() ?? 0}</span>
+          <div className="flex items-center gap-4 text-xs text-white/40 mb-5">
+            <span className="flex items-center gap-1.5"><Eye className="w-3.5 h-3.5" />{obra.viewsTotal?.toLocaleString() ?? 0} views</span>
           </div>
           <Button
-            className="bg-white/20 hover:bg-primary border border-white/30 text-white font-bold gap-2 backdrop-blur-sm transition-all"
+            className="bg-white/10 hover:bg-primary border border-white/20 hover:border-primary text-white font-bold gap-2.5 backdrop-blur-sm transition-all duration-300 shadow-lg px-6 py-5 text-sm"
             onClick={() => onObraClick(obra.id)}
           >
             <Play className="w-4 h-4 fill-white" />
@@ -140,12 +159,12 @@ function HeroBanner({ obras, onObraClick }: { obras: any[]; onObraClick: (id: nu
 
       {/* Dots */}
       {obras.length > 1 && (
-        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
           {obras.slice(0, 6).map((_, i) => (
             <button
               key={i}
               onClick={() => setIdx(i)}
-              className={`h-1.5 rounded-full transition-all ${i === idx ? "w-6 bg-primary" : "w-1.5 bg-white/30"}`}
+              className={`h-1.5 rounded-full transition-all duration-300 ${i === idx ? "w-8 bg-primary shadow-lg shadow-primary/50" : "w-1.5 bg-white/20 hover:bg-white/40"}`}
             />
           ))}
         </div>
@@ -162,7 +181,7 @@ function ObraCard({ obra, onClick }: { obra: any; onClick: () => void }) {
   return (
     <div
       onClick={onClick}
-      className="asc-card overflow-hidden cursor-pointer group transition-all duration-200 hover:border-primary/40 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-primary/10"
+      className="asc-card overflow-hidden cursor-pointer group transition-all duration-200 hover:border-primary/40 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10"
     >
       <div className="relative aspect-[3/4] bg-secondary overflow-hidden">
         {obra.coverUrl ? (
@@ -216,7 +235,7 @@ function Carrossel({ obras, titulo, icone, onObraClick }: {
   onObraClick: (id: number) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
-  const SCROLL_AMOUNT = 320;
+  const SCROLL_AMOUNT = 340;
 
   function scroll(dir: "left" | "right") {
     if (!scrollRef.current) return;
@@ -227,15 +246,15 @@ function Carrossel({ obras, titulo, icone, onObraClick }: {
 
   return (
     <section className="relative">
-      <div className="flex items-center gap-2 mb-3">
+      <div className="flex items-center gap-2.5 mb-4">
         {icone}
-        <h2 className="text-lg font-black text-white">{titulo}</h2>
-        <span className="text-xs text-muted-foreground">{obras.length} obras</span>
+        <h2 className="text-base sm:text-lg font-black text-white">{titulo}</h2>
+        <span className="text-xs text-muted-foreground bg-white/5 px-2 py-0.5 rounded-full">{obras.length}</span>
       </div>
       <div className="relative group">
         <button
           onClick={() => scroll("left")}
-          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 z-10 w-8 h-8 bg-black/80 border border-border rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary/80 shadow-lg"
+          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-4 z-10 w-9 h-9 bg-black/90 border border-border rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all hover:bg-primary hover:border-primary shadow-xl"
         >
           <ChevronLeft className="w-4 h-4" />
         </button>
@@ -245,14 +264,14 @@ function Carrossel({ obras, titulo, icone, onObraClick }: {
           style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
         >
           {obras.map((obra) => (
-            <div key={obra.id} className="flex-shrink-0 w-36 sm:w-40">
+            <div key={obra.id} className="flex-shrink-0 w-36 sm:w-40 lg:w-44">
               <ObraCard obra={obra} onClick={() => onObraClick(obra.id)} />
             </div>
           ))}
         </div>
         <button
           onClick={() => scroll("right")}
-          className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-3 z-10 w-8 h-8 bg-black/80 border border-border rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-opacity hover:bg-primary/80 shadow-lg"
+          className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-4 z-10 w-9 h-9 bg-black/90 border border-border rounded-full flex items-center justify-center text-white opacity-0 group-hover:opacity-100 transition-all hover:bg-primary hover:border-primary shadow-xl"
         >
           <ChevronRight className="w-4 h-4" />
         </button>
@@ -271,15 +290,12 @@ export default function Home() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [showBanner, setShowBanner] = useState(false);
   const debouncedSearch = useDebounce(search, 350);
-
   const isTranslator = isAuthenticated && user?.role !== "usuario";
+  const buscando = !!(debouncedSearch || genre);
 
-  // Mostrar banner a cada 1 hora
   useEffect(() => {
     const lastSeen = parseInt(localStorage.getItem("asc_banner_seen") ?? "0");
-    if (Date.now() - lastSeen > BANNER_INTERVAL_MS) {
-      setShowBanner(true);
-    }
+    if (Date.now() - lastSeen > BANNER_INTERVAL_MS) setShowBanner(true);
   }, []);
 
   function closeBanner() {
@@ -307,32 +323,32 @@ export default function Home() {
     setTimeout(() => { setRecentLimit((p) => p + LOAD_MORE); setLoadingMore(false); }, 250);
   }
 
-  const buscando = !!(debouncedSearch || genre);
-
   return (
     <div className="min-h-screen">
       <Topbar />
-      <main className="container py-6 space-y-8">
+      <main className="container py-6 space-y-8 max-w-screen-xl mx-auto">
 
-        {/* Hero Banner — só sem busca ativa */}
-        {!buscando && hotObras.length > 0 && (
-          <HeroBanner obras={hotObras.slice(0, 6)} onObraClick={goObra} />
-        )}
+        {/* Barra de busca — sempre no topo */}
+        <div className="relative max-w-2xl mx-auto lg:mx-0">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+          <Input
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setRecentLimit(INITIAL_RECENT); }}
+            placeholder="Buscar obra ou autor..."
+            className="pl-10 bg-secondary border-border text-white placeholder:text-muted-foreground h-11 rounded-xl"
+          />
+          {search && (
+            <button
+              onClick={() => { setSearch(""); setRecentLimit(INITIAL_RECENT); }}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
 
-        {/* Banner ASCENDER */}
-        {!buscando && showBanner && <AscenderBanner onClose={closeBanner} />}
-
-        {/* Busca + gêneros */}
-        <div className="space-y-3">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
-            <Input
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setRecentLimit(INITIAL_RECENT); }}
-              placeholder="Buscar obra ou autor..."
-              className="pl-9 bg-secondary border-border text-white placeholder:text-muted-foreground"
-            />
-          </div>
+        {/* Filtros de gênero — só aparecem ao buscar */}
+        {buscando && (
           <div className="flex gap-2 flex-wrap">
             {GENRES.map((g) => (
               <button
@@ -348,11 +364,18 @@ export default function Home() {
               </button>
             ))}
           </div>
-        </div>
+        )}
 
-        {/* Carrosséis — só sem busca ativa */}
+        {/* Conteúdo principal — só sem busca ativa */}
         {!buscando && (
           <>
+            {/* Hero */}
+            {hotObras.length > 0 && <HeroBanner obras={hotObras.slice(0, 6)} onObraClick={goObra} />}
+
+            {/* Banner ASCENDER */}
+            {showBanner && <AscenderBanner onClose={closeBanner} />}
+
+            {/* Carrosséis */}
             {isTranslator && minhasObras.length > 0 && (
               <Carrossel
                 obras={minhasObras}
@@ -366,42 +389,46 @@ export default function Home() {
           </>
         )}
 
-        {/* Lançamentos / Busca */}
+        {/* Lançamentos / Resultados */}
         <section>
-          <div className="flex items-center gap-2 mb-4">
+          <div className="flex items-center gap-2.5 mb-5">
             <Clock className="w-5 h-5 text-green-400" />
-            <h2 className="text-lg font-black text-white">
-              {buscando ? "Resultados" : "Lançamentos"}
+            <h2 className="text-base sm:text-lg font-black text-white">
+              {buscando ? "Resultados da busca" : "Lançamentos"}
             </h2>
             {recentObras.length > 0 && (
-              <span className="text-xs text-muted-foreground">
+              <span className="text-xs text-muted-foreground bg-white/5 px-2 py-0.5 rounded-full">
                 {recentObras.length} obra{recentObras.length !== 1 ? "s" : ""}
               </span>
             )}
           </div>
+
           {isLoading ? (
-            <div className="flex justify-center py-16"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
+            <div className="flex justify-center py-20"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
           ) : visibleRecent.length === 0 ? (
-            <div className="text-center py-16">
-              <p className="text-4xl mb-3">🔍</p>
-              <p className="text-muted-foreground">
+            <div className="text-center py-20">
+              <p className="text-5xl mb-4">🔍</p>
+              <p className="text-white/60 font-semibold mb-1">
                 {debouncedSearch ? `Nada encontrado para "${debouncedSearch}"` : "Nenhuma obra publicada ainda."}
               </p>
+              {debouncedSearch && (
+                <p className="text-white/30 text-sm">Tente outro termo ou remova os filtros</p>
+              )}
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4">
                 {visibleRecent.map((obra) => (
                   <ObraCard key={obra.id} obra={obra} onClick={() => goObra(obra.id)} />
                 ))}
               </div>
               {hasMore && (
-                <div className="flex justify-center mt-8">
+                <div className="flex justify-center mt-10">
                   <Button
                     variant="outline"
                     onClick={loadMore}
                     disabled={loadingMore}
-                    className="border-border text-white/70 hover:text-white hover:bg-white/5 gap-2 px-10 py-5"
+                    className="border-border text-white/70 hover:text-white hover:bg-white/5 gap-2 px-12 py-5 rounded-xl"
                   >
                     {loadingMore ? <Loader2 className="w-4 h-4 animate-spin" /> : <ChevronDown className="w-4 h-4" />}
                     {loadingMore ? "Carregando..." : `Ver mais — ${recentObras.length - recentLimit} obras`}
@@ -409,7 +436,7 @@ export default function Home() {
                 </div>
               )}
               {!hasMore && recentObras.length > INITIAL_RECENT && (
-                <p className="text-center text-xs text-muted-foreground mt-6">
+                <p className="text-center text-xs text-muted-foreground mt-8">
                   ✓ Todas as {recentObras.length} obras exibidas
                 </p>
               )}
@@ -420,4 +447,3 @@ export default function Home() {
     </div>
   );
 }
-
