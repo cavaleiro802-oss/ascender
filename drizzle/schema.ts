@@ -5,22 +5,21 @@ import {
 
 // ─── Enums ───────────────────────────────────────────────────────────────────
 export const roleEnum = pgEnum("role", [
-  "usuario",
-  "tradutor_aprendiz",
-  "tradutor_oficial",
-  "criador",
-  "admin_senhor",
-  "admin_supremo",
+  "usuario", "tradutor_aprendiz", "tradutor_oficial",
+  "criador", "admin_senhor", "admin_supremo",
 ]);
-
 export const obraStatusEnum    = pgEnum("obra_status",    ["em_espera", "aprovada", "rejeitada"]);
 export const obraAndamentoEnum = pgEnum("obra_andamento", ["em_andamento", "iato", "finalizado"]);
 export const capStatusEnum     = pgEnum("cap_status",     ["aguardando", "aprovado", "rejeitado"]);
 export const reportTipoEnum    = pgEnum("report_tipo",    ["imagem_faltando", "cap_nao_carrega", "erro_traducao", "outro"]);
 export const pedidoTipoEnum    = pgEnum("pedido_tipo",    ["quero_aprender", "posso_ajudar"]);
 export const pedidoStatusEnum  = pgEnum("pedido_status",  ["pendente", "aprovado", "rejeitado"]);
-export const notifTipoEnum     = pgEnum("notif_tipo",     ["cargo_aprovado", "cargo_rejeitado", "bem_vindo_equipe"]);
+export const notifTipoEnum     = pgEnum("notif_tipo",     ["cargo_aprovado", "cargo_rejeitado", "bem_vindo_equipe", "resposta_comentario"]);
 export const transferStatusEnum = pgEnum("transfer_status", ["pendente", "aprovado", "rejeitado"]);
+
+// Loja
+export const lojaItemTipoEnum  = pgEnum("loja_item_tipo", ["moldura", "banner", "cor_comentario", "tag"]);
+export const lojaItemRaridadeEnum = pgEnum("loja_item_raridade", ["comum", "raro", "epico", "lendario"]);
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 export const users = pgTable("users", {
@@ -34,6 +33,8 @@ export const users = pgTable("users", {
   bannedTotal:       boolean("bannedTotal").default(false).notNull(),
   displayName:       varchar("displayName", { length: 100 }),
   avatarUrl:         text("avatarUrl"),
+  cosmeticos:        text("cosmeticos"),    // JSON: { molduraId, bannerId, corComentario, tagId } ativos
+  moedas:            integer("moedas").default(0).notNull(),
   ultimoPedidoCargo: timestamp("ultimoPedidoCargo"),
   createdAt:         timestamp("createdAt").defaultNow().notNull(),
   updatedAt:         timestamp("updatedAt").defaultNow().notNull(),
@@ -69,7 +70,6 @@ export const obras = pgTable("obras", {
   authorIdx:     index("obras_author_idx").on(t.authorId),
   updatedIdx:    index("obras_updated_idx").on(t.updatedAt),
 }));
-
 export type Obra = typeof obras.$inferSelect;
 
 // ─── Capítulos ────────────────────────────────────────────────────────────────
@@ -92,7 +92,6 @@ export const capitulos = pgTable("capitulos", {
   authorIdx:     index("cap_author_idx").on(t.authorId),
   obraNumeroUnq: uniqueIndex("cap_obra_numero_unq").on(t.obraId, t.numero),
 }));
-
 export type Capitulo = typeof capitulos.$inferSelect;
 
 // ─── Transferência de Obra ────────────────────────────────────────────────────
@@ -112,7 +111,6 @@ export const obraTransferRequests = pgTable("obra_transfer_requests", {
   requesterIdx: index("transfer_requester_idx").on(t.requesterId),
   statusIdx:    index("transfer_status_idx").on(t.status),
 }));
-
 export type ObraTransferRequest = typeof obraTransferRequests.$inferSelect;
 
 // ─── Feature Flags ────────────────────────────────────────────────────────────
@@ -121,7 +119,6 @@ export const featureFlags = pgTable("feature_flags", {
   enabled:   boolean("enabled").default(false).notNull(),
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
-
 export type FeatureFlag = typeof featureFlags.$inferSelect;
 
 // ─── Views Registro ───────────────────────────────────────────────────────────
@@ -142,6 +139,7 @@ export const comentarios = pgTable("comentarios", {
   id:        integer("id").primaryKey().generatedAlwaysAsIdentity(),
   obraId:    integer("obraId").notNull(),
   autorId:   integer("autorId").notNull(),
+  parentId:  integer("parentId"),   // null = raiz, id = resposta
   content:   text("content").notNull(),
   deleted:   boolean("deleted").default(false).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -150,6 +148,7 @@ export const comentarios = pgTable("comentarios", {
   obraIdx:    index("com_obra_idx").on(t.obraId),
   createdIdx: index("com_created_idx").on(t.createdAt),
   autorIdx:   index("com_autor_idx").on(t.autorId),
+  parentIdx:  index("com_parent_idx").on(t.parentId),
 }));
 
 // ─── Curtidas ─────────────────────────────────────────────────────────────────
@@ -220,7 +219,6 @@ export const reports = pgTable("reports", {
   unq:          uniqueIndex("report_user_cap_unq").on(t.userId, t.capituloId),
   resolvidoIdx: index("report_resolvido_idx").on(t.resolvido),
 }));
-
 export type Report = typeof reports.$inferSelect;
 
 // ─── Pedidos de Cargo ─────────────────────────────────────────────────────────
@@ -264,4 +262,58 @@ export const notificacoes = pgTable("notificacoes", {
 }, (t) => ({
   userLidaIdx: index("notif_user_lida_idx").on(t.userId, t.lida),
 }));
+
+// ─── Loja: Itens ──────────────────────────────────────────────────────────────
+// Admin cadastra itens. tipo define onde aparece (moldura=avatar, banner=fundo comentário, etc)
+// gratuito=true + cargoMinimo = item concedido automaticamente ao atingir o cargo
+export const lojaItens = pgTable("loja_itens", {
+  id:          integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  nome:        varchar("nome",        { length: 100 }).notNull(),
+  descricao:   text("descricao"),
+  tipo:        lojaItemTipoEnum("tipo").notNull(),
+  raridade:    lojaItemRaridadeEnum("raridade").default("comum").notNull(),
+  preco:       integer("preco").default(0).notNull(),         // em moedas; 0 = gratuito
+  mediaUrl:    text("mediaUrl").notNull(),                    // URL R2 do gif/webp/mp4
+  mediaKey:    varchar("mediaKey", { length: 500 }),          // chave R2
+  ativo:       boolean("ativo").default(true).notNull(),      // visível na loja
+  gratuito:    boolean("gratuito").default(false).notNull(),  // ganho automaticamente por cargo
+  cargoMinimo: varchar("cargoMinimo", { length: 50 }),        // ex: "tradutor_aprendiz"
+  createdAt:   timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({
+  tipoIdx:     index("loja_tipo_idx").on(t.tipo),
+  ativoIdx:    index("loja_ativo_idx").on(t.ativo),
+}));
+export type LojaItem = typeof lojaItens.$inferSelect;
+
+// ─── Loja: Itens do Usuário ───────────────────────────────────────────────────
+// Itens que o usuário possui (comprados ou ganhos por cargo)
+// equipado=true significa que está ativo/exibindo no perfil/comentários
+export const usuarioItens = pgTable("usuario_itens", {
+  id:          integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId:      integer("userId").notNull(),
+  itemId:      integer("itemId").notNull(),
+  equipado:    boolean("equipado").default(false).notNull(),
+  origem:      varchar("origem", { length: 20 }).default("compra").notNull(), // "compra" | "cargo"
+  createdAt:   timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({
+  userIdx:     index("uitem_user_idx").on(t.userId),
+  unq:         uniqueIndex("uitem_user_item_unq").on(t.userId, t.itemId),
+}));
+export type UsuarioItem = typeof usuarioItens.$inferSelect;
+
+// ─── Loja: Transações de Moedas ───────────────────────────────────────────────
+// Histórico de todas as movimentações de moedas do usuário
+export const moedasTransacoes = pgTable("moedas_transacoes", {
+  id:        integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId:    integer("userId").notNull(),
+  valor:     integer("valor").notNull(),          // positivo = ganhou, negativo = gastou
+  tipo:      varchar("tipo", { length: 50 }).notNull(), // "compra_item" | "recarga" | "cargo"
+  descricao: text("descricao"),
+  itemId:    integer("itemId"),                   // se foi compra de item
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({
+  userIdx: index("moedas_user_idx").on(t.userId),
+}));
+export type MoedasTransacao = typeof moedasTransacoes.$inferSelect;
+
 
