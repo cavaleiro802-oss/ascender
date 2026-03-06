@@ -17,6 +17,7 @@ import {
   deletarSessao,
   deleteComentario,
   getCapituloById,
+  getComentarioById,
   getCurtida,
   getFavorito,
   getHistoricoLeitura,
@@ -252,12 +253,25 @@ const capitulosRouter = router({
 const comentariosRouter = router({
   list: publicProcedure.input(z.object({ obraId: z.number() })).query(({ input }) => listComentarios(input.obraId)),
   create: protectedProcedure
-    .input(z.object({ obraId: z.number(), content: z.string().min(1).max(500) }))
+    .input(z.object({ obraId: z.number(), content: z.string().min(1).max(500), parentId: z.number().optional() }))
     .mutation(async ({ ctx, input }) => {
       canInteract(ctx.user);
       const rl = checkRateLimit({ key: `comentario:${ctx.user.id}`, ...LIMITS.comentario });
       if (!rl.allowed) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `Muitos comentários. Aguarde ${rl.retryAfterSec}s.` });
-      await createComentario({ obraId: input.obraId, autorId: ctx.user.id, content: input.content });
+      const novoComentario = await createComentario({ obraId: input.obraId, autorId: ctx.user.id, content: input.content, parentId: input.parentId });
+      // Notificar autor do comentário pai se for resposta
+      if (input.parentId) {
+        const pai = await getComentarioById(input.parentId);
+        if (pai && pai.autorId !== ctx.user.id) {
+          const obra = await getObraById(input.obraId);
+          await criarNotificacao({
+            userId: pai.autorId,
+            tipo: "resposta_comentario",
+            titulo: "💬 Alguém respondeu seu comentário",
+            mensagem: `${ctx.user.displayName || ctx.user.name || "Alguém"} respondeu: "${input.content.slice(0, 80)}${input.content.length > 80 ? "..." : ""}" — em ${obra?.title ?? "uma obra"}`,
+          });
+        }
+      }
       return { success: true };
     }),
   delete: protectedProcedure
