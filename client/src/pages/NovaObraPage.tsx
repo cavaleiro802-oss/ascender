@@ -11,20 +11,26 @@ import { toast } from "sonner";
 import { ImagePlus, Loader2, Upload } from "lucide-react";
 
 const GENRES = [
-"Novel", "Manhwar", "Manga", "Ação", "Aventura", "Comédia", "Drama", "Fantasia",
+  "Novel", "Manhwar", "Manga", "Ação", "Aventura", "Comédia", "Drama", "Fantasia",
   "Horror", "Mistério", "Romance", "Sci-Fi", "Slice of Life", "Culinaria",
   "Supernatural", "Esportes", "Histórico", "Psicológico", "Ecchi",
+];
+
+const ANDAMENTO_OPTIONS = [
+  { value: "em_andamento", label: "▶ Em Andamento", cls: "border-green-500/50 text-green-400 bg-green-500/10" },
+  { value: "iato",         label: "⏸ Iato",         cls: "border-yellow-500/50 text-yellow-400 bg-yellow-500/10" },
+  { value: "finalizado",   label: "✓ Finalizado",   cls: "border-blue-500/50 text-blue-400 bg-blue-500/10" },
 ];
 
 export default function NovaObraPage() {
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
   const fileRef = useRef<HTMLInputElement>(null);
-
   const [title, setTitle] = useState("");
   const [synopsis, setSynopsis] = useState("");
   const [originalAuthor, setOriginalAuthor] = useState("");
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
+  const [andamento, setAndamento] = useState<"em_andamento" | "iato" | "finalizado">("em_andamento");
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -62,24 +68,22 @@ export default function NovaObraPage() {
     );
   }
 
-function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
-  const file = e.target.files?.[0];
-  if (!file) return;
-  if (!["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(file.type)) {
-    toast.error("Formato inválido. Use JPG, PNG ou WebP.");
-    return;
+  function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(file.type)) {
+      toast.error("Formato inválido. Use JPG, PNG ou WebP.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error("Imagem muito grande. Máximo 10MB.");
+      return;
+    }
+    setCoverFile(file);
+    const reader = new FileReader();
+    reader.onload = (ev) => setCoverPreview(ev.target?.result as string);
+    reader.readAsDataURL(file);
   }
-  if (file.size > 10 * 1024 * 1024) {
-    toast.error("Imagem muito grande. Máximo 10MB.");
-    return;
-  }
-  setCoverFile(file);
-  const reader = new FileReader();
-  reader.onload = (ev) => {
-    setCoverPreview(ev.target?.result as string);
-  };
-  reader.readAsDataURL(file);
-}
 
   function toggleGenre(g: string) {
     setSelectedGenres((prev) =>
@@ -90,18 +94,15 @@ function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
   async function handleSubmit() {
     if (!title.trim()) return toast.error("Título obrigatório.");
     if (selectedGenres.length === 0) return toast.error("Selecione pelo menos 1 gênero.");
-
     setUploading(true);
     try {
       let coverUrl: string | undefined;
       let coverKey: string | undefined;
-
       if (coverFile) {
         const result = await uploadCapa(coverFile);
         coverUrl = result.publicUrl;
         coverKey = result.key;
       }
-
       await criar.mutateAsync({
         title: title.trim(),
         synopsis: synopsis.trim() || undefined,
@@ -109,6 +110,7 @@ function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
         genres: selectedGenres,
         coverUrl,
         coverKey,
+        andamento,
       });
     } catch (e: any) {
       toast.error(e.message || "Erro ao enviar obra.");
@@ -124,16 +126,12 @@ function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
       <Topbar />
       <main className="container py-8 max-w-2xl">
         <h1 className="text-2xl font-black text-white mb-6">📚 Nova Obra</h1>
-
         <div className="space-y-6">
 
           {/* Capa */}
           <div>
             <Label className="text-white/80 mb-2 block">Capa da Obra</Label>
-            <div
-              onClick={() => fileRef.current?.click()}
-              className="relative cursor-pointer group"
-            >
+            <div onClick={() => fileRef.current?.click()} className="relative cursor-pointer group">
               {coverPreview ? (
                 <div className="relative w-40 h-56 rounded-xl overflow-hidden border-2 border-primary/50">
                   <img src={coverPreview} alt="Capa" className="w-full h-full object-cover" />
@@ -175,6 +173,26 @@ function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
             <p className="text-xs text-muted-foreground mt-1">{synopsis.length}/2000</p>
           </div>
 
+          {/* Status de andamento */}
+          <div>
+            <Label className="text-white/80 mb-1.5 block">Status da Obra</Label>
+            <div className="flex gap-2 flex-wrap">
+              {ANDAMENTO_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  onClick={() => setAndamento(opt.value as any)}
+                  className={`px-4 py-1.5 rounded-full text-xs font-semibold border transition-colors ${
+                    andamento === opt.value
+                      ? opt.cls
+                      : "bg-transparent border-border text-white/50 hover:border-white/40 hover:text-white"
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           {/* Gêneros */}
           <div>
             <Label className="text-white/80 mb-1.5 block">
@@ -201,7 +219,6 @@ function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
               <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> {uploading ? "Enviando capa..." : "Salvando..."}</>
             ) : "Enviar para aprovação"}
           </Button>
-
           <p className="text-xs text-muted-foreground text-center">
             Sua obra será revisada por um administrador antes de ser publicada.
           </p>
@@ -210,3 +227,4 @@ function handleCoverChange(e: React.ChangeEvent<HTMLInputElement>) {
     </div>
   );
 }
+
