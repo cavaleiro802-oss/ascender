@@ -231,7 +231,7 @@ export async function getObraById(id: number) {
   return result[0];
 }
 
-export async function createObra(data: { title: string; synopsis?: string; genres?: string[]; coverUrl?: string; authorId: number; originalAuthor?: string; status: "em_espera" | "aprovada"; }) {
+export async function createObra(data: { title: string; synopsis?: string; genres?: string[]; coverUrl?: string; authorId: number; originalAuthor?: string; status: "em_espera" | "aprovada"; andamento?: "em_andamento" | "iato" | "finalizado"; }) {
   const db = await getDb();
   if (!db) throw new Error("DB unavailable");
   // CORRIGIDO: .returning() para PostgreSQL retornar o registro inserido como array
