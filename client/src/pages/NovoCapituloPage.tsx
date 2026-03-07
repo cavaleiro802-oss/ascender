@@ -70,7 +70,6 @@ export default function NovoCapituloPage() {
     setPreviews((prev) => prev.filter((_, i) => i !== idx));
   }
 
-  // Drag and drop
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     handleFiles(e.dataTransfer.files);
@@ -81,7 +80,7 @@ export default function NovoCapituloPage() {
     if (arquivos.length === 0) return toast.error("Adicione pelo menos 1 página.");
 
     const resultados = await uploadCapitulo(arquivos);
-    if (!resultados) return; // erro já tratado no hook
+    if (!resultados) return;
 
     const paginas = resultados.map((r) => r.publicUrl);
     const paginasKeys = resultados.map((r) => r.key);
@@ -133,7 +132,8 @@ export default function NovoCapituloPage() {
               <p className="text-sm text-muted-foreground">Clique ou arraste as imagens aqui</p>
               <p className="text-xs text-muted-foreground mt-1">JPG, PNG, WebP • máx 10MB por imagem • até 100 páginas</p>
             </div>
-            <input ref={fileRef} type="file" accept="image/*" multiple className="hidden"
+            {/* accept com extensões em vez de image/* para abrir gerenciador de arquivos no Android */}
+            <input ref={fileRef} type="file" accept=".jpg,.jpeg,.png,.webp" multiple className="hidden"
               onChange={(e) => handleFiles(e.target.files)} />
           </div>
 
@@ -166,7 +166,7 @@ export default function NovoCapituloPage() {
             </div>
           )}
 
-          {/* Barra de progresso de upload */}
+          {/* Barra de progresso */}
           {uploading && (
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
