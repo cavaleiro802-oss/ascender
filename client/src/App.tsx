@@ -20,10 +20,10 @@ export default function App() {
       <Switch>
         <Route path="/" component={Home} />
         <Route path="/login" component={LoginPage} />
-        <Route path="/obra/:id" component={ObraPage} />
-        <Route path="/obra/:obraId/capitulo/:capId" component={CapituloPage} />
-        <Route path="/nova-obra" component={NovaObraPage} />
         <Route path="/obra/:id/novo-capitulo" component={NovoCapituloPage} />
+        <Route path="/obra/:obraId/capitulo/:capId" component={CapituloPage} />
+        <Route path="/obra/:id" component={ObraPage} />
+        <Route path="/nova-obra" component={NovaObraPage} />
         <Route path="/biblioteca" component={BibliotecaPage} />
         <Route path="/admin" component={AdminPage} />
         <Route path="/admin/:tab" component={AdminPage} />
