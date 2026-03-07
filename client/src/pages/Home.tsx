@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/useAuth";
 import { useLocation } from "wouter";
 import Topbar from "@/components/Topbar";
+import PedidoCargoModal from "@/components/PedidoCargoModal";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -31,7 +32,8 @@ const PROPAGANDAS = [
     titulo: "Onde leitores se tornam tradutores",
     subtitulo: "Junte-se à comunidade e contribua com traduções",
     btnLabel: "Quero ser Tradutor",
-    rota: "/perfil",
+    rota: null,
+    acao: "pedido_cargo",
     gradient: "from-[#0d0010] via-[#110016] to-[#0a000d]",
     glow1: "bg-primary/10",
     glow2: "bg-purple-500/10",
@@ -69,7 +71,7 @@ function parseGenres(genres?: string | null): string[] {
 }
 
 // ─── Propaganda rotativa ─────────────────────────────────────────────────────
-function PropagandaBanner({ onClose }: { onClose: () => void }) {
+function PropagandaBanner({ onClose, onAction }: { onClose: () => void; onAction?: (acao: string) => void }) {
   const [, navigate] = useLocation();
   const [idx, setIdx] = useState(0);
   const [animating, setAnimating] = useState(false);
@@ -120,7 +122,7 @@ function PropagandaBanner({ onClose }: { onClose: () => void }) {
               size="sm"
               
               className={`bg-gradient-to-r ${p.btnCls} text-white font-bold shadow-lg border-0 px-4 sm:px-5`}
-              onClick={() => navigate(p.rota!)}
+              onClick={() => { if ((p as any).acao) { onAction?.((p as any).acao); } else if (p.rota) { navigate(p.rota); } }}
             >
               {p.btnLabel}
             </Button>
@@ -340,6 +342,7 @@ export default function Home() {
   const [recentLimit, setRecentLimit] = useState(INITIAL_RECENT);
   const [loadingMore, setLoadingMore] = useState(false);
   const [showBanner, setShowBanner] = useState(false);
+  const [showPedidoModal, setShowPedidoModal] = useState(false);
   const debouncedSearch = useDebounce(search, 350);
   const isTranslator = isAuthenticated && user?.role !== "usuario";
   const buscando = !!(debouncedSearch || genre);
@@ -424,7 +427,7 @@ export default function Home() {
             {hotObras.length > 0 && <HeroBanner obras={hotObras.slice(0, 6)} onObraClick={goObra} />}
 
             {/* Banner ASCENDER */}
-            {showBanner && <PropagandaBanner onClose={closeBanner} />}
+            {showBanner && <PropagandaBanner onClose={closeBanner} onAction={(acao) => { if (acao === "pedido_cargo") setShowPedidoModal(true); }} />}
 
             {/* Carrosséis */}
             {isTranslator && minhasObras.length > 0 && (
@@ -495,6 +498,7 @@ export default function Home() {
           )}
         </section>
       </main>
+      {showPedidoModal && <PedidoCargoModal onClose={() => setShowPedidoModal(false)} />}
     </div>
   );
 }
