@@ -427,7 +427,7 @@ const RARIDADE_LABELS: Record<string, { label: string; cls: string }> = {
   lendario: { label: "Lendário", cls: "text-yellow-400"  },
 };
 const CARGO_OPTIONS = [
-  { value: "", label: "Nenhum (item pago)" },
+  { value: "nenhum", label: "Nenhum (item pago)" },
   { value: "tradutor_aprendiz", label: "Tradutor Aprendiz" },
   { value: "tradutor_oficial",  label: "Tradutor Oficial"  },
   { value: "admin_senhor",      label: "Admin Senhor"      },
@@ -534,7 +534,7 @@ function LojaTab({ onError }: { onError?: () => void }) {
           </div>
           <div>
             <Label className="text-white/60 text-xs mb-1 block">Conceder automaticamente ao cargo</Label>
-            <Select value={cargoMinimo} onValueChange={(v) => { setCargoMinimo(v); if (v) setGratuito(true); }}>
+            <Select value={cargoMinimo || "nenhum"} onValueChange={(v) => { const val = v === "nenhum" ? "" : v; setCargoMinimo(val); if (val) setGratuito(true); }}>
               <SelectTrigger className="bg-secondary border-border text-white"><SelectValue placeholder="Nenhum" /></SelectTrigger>
               <SelectContent className="bg-card border-border text-white">
                 {CARGO_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value} className="text-white">{o.label}</SelectItem>)}
@@ -657,4 +657,3 @@ function LojaTab({ onError }: { onError?: () => void }) {
     </div>
   );
 }
-
