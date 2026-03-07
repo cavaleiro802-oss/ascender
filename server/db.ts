@@ -265,6 +265,10 @@ export async function getCapituloById(id: number) {
 export async function createCapitulo(data: { obraId: number; authorId: number; numero: number; title?: string; paginas?: string; paginasKeys?: string; status: "aguardando" | "aprovado"; }) {
   const db = await getDb(); if (!db) throw new Error("DB unavailable");
   const result = await db.insert(capitulos).values(data).returning();
+  // Atualizar updatedAt da obra para aparecer no topo da home
+  if (data.status === "aprovado") {
+    await db.update(obras).set({ updatedAt: new Date() }).where(eq(obras.id, data.obraId));
+  }
   return result[0];
 }
 export async function countCapitulosAguardando(authorId: number) {
@@ -275,6 +279,11 @@ export async function countCapitulosAguardando(authorId: number) {
 export async function updateCapituloStatus(capId: number, status: "aguardando" | "aprovado" | "rejeitado") {
   const db = await getDb(); if (!db) return;
   await db.update(capitulos).set({ status, updatedAt: new Date() }).where(eq(capitulos.id, capId));
+  // Se aprovado, sobe a obra no topo da home
+  if (status === "aprovado") {
+    const cap = await db.select({ obraId: capitulos.obraId }).from(capitulos).where(eq(capitulos.id, capId)).limit(1);
+    if (cap[0]) await db.update(obras).set({ updatedAt: new Date() }).where(eq(obras.id, cap[0].obraId));
+  }
 }
 export async function incrementCapituloViews(capId: number) {
   const db = await getDb(); if (!db) return;
