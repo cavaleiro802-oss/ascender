@@ -8,6 +8,7 @@ import NovoCapituloPage from "@/pages/NovoCapituloPage";
 import BibliotecaPage from "@/pages/BibliotecaPage";
 import AdminPage from "@/pages/AdminPage";
 import PerfilPage from "@/pages/PerfilPage";
+import LojaPage from "@/pages/LojaPage";
 import NotFound from "@/pages/NotFound";
 import Footer from "@/components/Footer";
 import LoginPage from "@/pages/LoginPage";
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="/admin" component={AdminPage} />
         <Route path="/admin/:tab" component={AdminPage} />
         <Route path="/perfil" component={PerfilPage} />
+        <Route path="/loja" component={LojaPage} />
         <Route component={NotFound} />
       </Switch>
       <Footer />
