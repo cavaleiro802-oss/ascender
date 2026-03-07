@@ -5,7 +5,7 @@ import {
   Link2, Shield, Users, X, UserCheck, ShoppingBag,
   Plus, Eye, EyeOff, Upload, Trash2,
 } from "lucide-react";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useLocation, useParams } from "wouter";
 import Topbar from "@/components/Topbar";
 import { Button } from "@/components/ui/button";
@@ -72,7 +72,7 @@ export default function AdminPage() {
         </div>
 
         <Tabs defaultValue={tab ?? "stats"}>
-          <TabsList className="bg-secondary border-border mb-6 flex-wrap h-auto gap-1">
+          <TabsList className="bg-secondary border-border mb-6 flex-wrap h-auto gap-1 w-full">
             <TabsTrigger value="stats"     className="data-[state=active]:bg-primary data-[state=active]:text-white"><BarChart3  className="w-4 h-4 mr-1.5" />Stats</TabsTrigger>
             <TabsTrigger value="obras"     className="data-[state=active]:bg-primary data-[state=active]:text-white"><BookOpen   className="w-4 h-4 mr-1.5" />Obras</TabsTrigger>
             <TabsTrigger value="capitulos" className="data-[state=active]:bg-primary data-[state=active]:text-white"><FileText   className="w-4 h-4 mr-1.5" />Capítulos</TabsTrigger>
@@ -265,28 +265,39 @@ function UsuariosTab({ isSupreme, currentUserId }: { isSupreme: boolean; current
         const estaBanidoSuave = u.banned && !u.bannedTotal;
         const estaBanidoTotal = u.bannedTotal;
         return (
-          <div key={u.id} className="asc-card p-4 flex items-center gap-4">
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <p className="font-semibold text-white">{u.displayName || u.name || "Sem nome"}</p>
+          <div key={u.id} className="asc-card p-4 space-y-3">
+            {/* Linha 1: nome + badges */}
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className="font-semibold text-white truncate">{u.displayName || u.name || "Sem nome"}</p>
+                <p className="text-xs text-muted-foreground mt-0.5 truncate">{u.email}</p>
+                <p className="text-xs text-muted-foreground">ID: {u.id} • 🪙 {u.moedas ?? 0}</p>
+              </div>
+              <div className="flex flex-col items-end gap-1 flex-shrink-0">
                 <span className={`asc-badge ${roleInfo?.cls}`}>{roleInfo?.label}</span>
                 {estaBanidoTotal && <span className="asc-badge asc-badge-red">🚫 Banido Total</span>}
                 {estaBanidoSuave && <span className="asc-badge asc-badge-yellow">⚠️ Banido</span>}
                 {isSelf && <span className="asc-badge asc-badge-blue">Você</span>}
               </div>
-              <p className="text-xs text-muted-foreground mt-0.5">{u.email} • ID: {u.id} • 🪙 {u.moedas ?? 0}</p>
             </div>
+            {/* Linha 2: ações */}
             {!isSelf && (
-              <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+              <div className="flex flex-wrap gap-2 pt-1 border-t border-border/50">
                 <Select value={u.role} onValueChange={(role) => setRole.mutate({ userId: u.id, role: role as any })}>
-                  <SelectTrigger className="w-36 bg-secondary border-border text-white text-sm h-8"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-36 bg-secondary border-border text-white text-sm h-8 flex-shrink-0"><SelectValue /></SelectTrigger>
                   <SelectContent className="bg-card border-border text-white">
                     {availableRoles.map((r) => <SelectItem key={r} value={r} className="text-white hover:bg-secondary">{ROLE_LABELS[r]?.label}</SelectItem>)}
                   </SelectContent>
                 </Select>
-                {!estaBanidoSuave && !estaBanidoTotal && <Button size="sm" variant="outline" className="border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10 text-xs" onClick={() => { setBanTarget(u); setBanTipo("suave"); }}>⚠️ Banir</Button>}
-                {!estaBanidoTotal && isSupreme && <Button size="sm" variant="outline" className="border-red-500/40 text-red-400 hover:bg-red-500/10 text-xs" onClick={() => { setBanTarget(u); setBanTipo("total"); }}>🚫 Ban Total</Button>}
-                {(estaBanidoSuave || estaBanidoTotal) && <Button size="sm" variant="outline" className="border-green-500/40 text-green-400 hover:bg-green-500/10 text-xs" onClick={() => banUserMut.mutate({ userId: u.id, banned: false, total: false })}>✅ Desbanir</Button>}
+                {!estaBanidoSuave && !estaBanidoTotal && (
+                  <Button size="sm" variant="outline" className="border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10 text-xs h-8" onClick={() => { setBanTarget(u); setBanTipo("suave"); }}>⚠️ Banir</Button>
+                )}
+                {!estaBanidoTotal && isSupreme && (
+                  <Button size="sm" variant="outline" className="border-red-500/40 text-red-400 hover:bg-red-500/10 text-xs h-8" onClick={() => { setBanTarget(u); setBanTipo("total"); }}>🚫 Ban Total</Button>
+                )}
+                {(estaBanidoSuave || estaBanidoTotal) && (
+                  <Button size="sm" variant="outline" className="border-green-500/40 text-green-400 hover:bg-green-500/10 text-xs h-8" onClick={() => banUserMut.mutate({ userId: u.id, banned: false, total: false })}>✅ Desbanir</Button>
+                )}
               </div>
             )}
           </div>
@@ -416,7 +427,10 @@ function LojaTab() {
   const [salvando, setSalvando]       = useState(false);
   const [filtroTipo, setFiltroTipo]   = useState<string>("todos");
 
-  const { data: itens = [] } = trpc.loja.listItens.useQuery({ tipo: filtroTipo !== "todos" ? filtroTipo : undefined });
+  const { data: itens = [], isError: itensError } = trpc.loja.listItens.useQuery(
+    { tipo: filtroTipo !== "todos" ? filtroTipo : undefined },
+    { retry: false }
+  );
   const criarItem    = trpc.loja.criarItem.useMutation({ onSuccess: () => { utils.loja.listItens.invalidate(); toast.success("Item criado!"); resetForm(); }, onError: (e) => toast.error(e.message) });
   const toggleItem   = trpc.loja.toggleItem.useMutation({ onSuccess: () => { utils.loja.listItens.invalidate(); toast.success("Item atualizado!"); }, onError: (e) => toast.error(e.message) });
 
@@ -572,7 +586,12 @@ function LojaTab() {
           </div>
         </div>
 
-        {itens.length === 0 ? (
+        {itensError ? (
+          <div className="asc-card p-8 text-center">
+            <p className="text-yellow-400 font-bold text-sm mb-1">⚠️ Tabelas da loja não encontradas</p>
+            <p className="text-muted-foreground text-xs">Rode as migrations SQL no DBeaver primeiro.</p>
+          </div>
+        ) : itens.length === 0 ? (
           <div className="asc-card p-8 text-center text-muted-foreground">Nenhum item cadastrado ainda.</div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -615,4 +634,3 @@ function LojaTab() {
     </div>
   );
 }
-
