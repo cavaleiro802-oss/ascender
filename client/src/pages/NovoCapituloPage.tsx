@@ -21,11 +21,15 @@ export default function NovoCapituloPage() {
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
 
+  const utils = trpc.useUtils();
   const { uploading, progress, error: uploadError, uploadCapitulo } = useUpload();
 
   const criar = trpc.capitulos.create.useMutation({
     onSuccess: () => {
       toast.success("Capítulo enviado! Aguardando aprovação.");
+      utils.obras.listRecent.invalidate();
+      utils.obras.listAll.invalidate();
+      utils.capitulos.list.invalidate({ obraId: parseInt(obraId) });
       navigate(`/obra/${obraId}`);
     },
     onError: (e) => toast.error(e.message),
@@ -196,4 +200,4 @@ export default function NovoCapituloPage() {
       </main>
     </div>
   );
-}
+                  }
