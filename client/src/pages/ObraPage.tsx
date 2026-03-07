@@ -250,7 +250,7 @@ export default function ObraPage() {
         )}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-black/60 to-background" />
         {/* Capa centralizada */}
-        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 z-10">
+        <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/3 z-10">
           <div className="relative w-32 sm:w-40 aspect-[3/4] rounded-xl overflow-hidden border-2 border-border shadow-2xl shadow-black">
             {obra.coverUrl ? (
               <img src={obra.coverUrl} alt={obra.title} className="w-full h-full object-cover" />
@@ -273,7 +273,7 @@ export default function ObraPage() {
         <input ref={coverFileRef} type="file" accept="image/*" className="hidden" onChange={handleEditCoverChange} />
       </div>
 
-      <main className="container max-w-2xl mx-auto pt-24 pb-10 px-4">
+      <main className="container max-w-2xl mx-auto pt-20 pb-10 px-4">
 
         {/* Título e info */}
         <div className="text-center mb-5">
