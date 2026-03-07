@@ -131,9 +131,10 @@ export default function NovoCapituloPage() {
               <ImagePlus className="w-8 h-8 text-white/20 group-hover:text-primary/50 mx-auto mb-2 transition-colors" />
               <p className="text-sm text-muted-foreground">Clique ou arraste as imagens aqui</p>
               <p className="text-xs text-muted-foreground mt-1">JPG, PNG, WebP • máx 10MB por imagem • até 100 páginas</p>
+              <p className="text-xs text-muted-foreground/60 mt-2">📂 No Android: se abrir a galeria, toque nos 3 pontinhos e selecione "Gerenciador de arquivos"</p>
             </div>
             {/* accept com extensões em vez de image/* para abrir gerenciador de arquivos no Android */}
-            <input ref={fileRef} type="file" accept=".jpg,.jpeg,.png,.webp" multiple className="hidden"
+            <input ref={fileRef} type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/jpg,image/png,image/webp" multiple className="hidden"
               onChange={(e) => handleFiles(e.target.files)} />
           </div>
 
