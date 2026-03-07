@@ -102,7 +102,9 @@ export default function AdminPage() {
           <TabsContent value="logs">     <LogsTab /></TabsContent>
           <TabsContent value="links">    <LinksTab /></TabsContent>
           {isSupreme && (
-            <TabsContent value="loja"><LojaTab /></TabsContent>
+            <TabsContent value="loja">
+              <LojaTabWrapper />
+            </TabsContent>
           )}
         </Tabs>
       </main>
@@ -393,6 +395,27 @@ function LinksTab() {
   );
 }
 
+
+// ─── Loja Tab Wrapper (proteção contra crash) ─────────────────────────────────
+function LojaTabWrapper() {
+  const [crashed, setCrashed] = useState(false);
+  if (crashed) {
+    return (
+      <div className="asc-card p-8 text-center space-y-3">
+        <p className="text-2xl">⚠️</p>
+        <p className="text-yellow-400 font-bold">Tabelas da loja não encontradas</p>
+        <p className="text-muted-foreground text-sm">
+          Rode as migrations SQL no DBeaver antes de usar esta aba.
+        </p>
+        <Button variant="outline" className="border-border text-white/60 mt-2" onClick={() => setCrashed(false)}>
+          Tentar novamente
+        </Button>
+      </div>
+    );
+  }
+  return <LojaTab onError={() => setCrashed(true)} />;
+}
+
 // ─── Loja Tab ─────────────────────────────────────────────────────────────────
 const TIPO_LABELS: Record<string, string> = {
   moldura: "🖼️ Moldura", banner: "🎬 Banner", cor_comentario: "🎨 Cor Comentário", tag: "🏷️ Tag",
@@ -410,7 +433,7 @@ const CARGO_OPTIONS = [
   { value: "admin_senhor",      label: "Admin Senhor"      },
 ];
 
-function LojaTab() {
+function LojaTab({ onError }: { onError?: () => void }) {
   const utils = trpc.useUtils();
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -429,7 +452,7 @@ function LojaTab() {
 
   const { data: itens = [], isError: itensError } = trpc.loja.listItens.useQuery(
     { tipo: filtroTipo !== "todos" ? filtroTipo : undefined },
-    { retry: false }
+    { retry: false, onError: () => onError?.() }
   );
   const criarItem    = trpc.loja.criarItem.useMutation({ onSuccess: () => { utils.loja.listItens.invalidate(); toast.success("Item criado!"); resetForm(); }, onError: (e) => toast.error(e.message) });
   const toggleItem   = trpc.loja.toggleItem.useMutation({ onSuccess: () => { utils.loja.listItens.invalidate(); toast.success("Item atualizado!"); }, onError: (e) => toast.error(e.message) });
@@ -634,3 +657,4 @@ function LojaTab() {
     </div>
   );
 }
+
