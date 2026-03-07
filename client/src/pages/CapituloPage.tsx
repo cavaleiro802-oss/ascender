@@ -23,10 +23,10 @@ export default function CapituloPage() {
   const { data: todosCapitulos = [] } = trpc.capitulos.listByObra.useQuery(
     { obraId: parseInt(obraId) }, { enabled: !!obraId }
   );
-  const registrarView = trpc.capitulos.registrarView.useMutation();
+  const registrarView = trpc.capitulos.incrementViews.useMutation();
 
   useEffect(() => {
-    if (capId) registrarView.mutate({ capituloId: parseInt(capId) });
+    if (capId) registrarView.mutate({ id: parseInt(capId) });
   }, [capId]);
 
   const paginas: string[] = capitulo?.paginas ? JSON.parse(capitulo.paginas) : [];
