@@ -30,12 +30,14 @@ export default function CapituloPage() {
   }, [capId]);
 
   const paginas: string[] = capitulo?.paginas ? JSON.parse(capitulo.paginas) : [];
-  const aprovados = (todosCapitulos as any[])
-    .filter((c) => c.status === "aprovado")
+
+  // Incluir aprovado + aguardando (para tradutor_oficial e admins verem seus caps)
+  const capsVisiveis = (todosCapitulos as any[])
+    .filter((c) => c.status === "aprovado" || c.status === "aguardando")
     .sort((a, b) => a.numero - b.numero);
-  const idx = aprovados.findIndex((c) => c.id === parseInt(capId));
-  const capAnterior = aprovados[idx - 1];
-  const capProximo = aprovados[idx + 1];
+  const idx = capsVisiveis.findIndex((c) => c.id === parseInt(capId));
+  const capAnterior = capsVisiveis[idx - 1];
+  const capProximo = capsVisiveis[idx + 1];
 
   useEffect(() => {
     if (modo !== "scroll") return;
@@ -110,7 +112,6 @@ export default function CapituloPage() {
             Nenhuma página disponível.
           </div>
         ) : modo === "scroll" ? (
-          /* ── MODO SCROLL ── */
           <div className="flex flex-col items-center">
             {paginas.map((url, i) => (
               <img key={i} src={url} alt={`Página ${i + 1}`}
@@ -120,18 +121,15 @@ export default function CapituloPage() {
             ))}
           </div>
         ) : (
-          /* ── MODO CLICK ── */
           <div className="relative flex items-center justify-center min-h-[calc(100vh-3rem)]">
             <img src={paginas[paginaAtual]} alt={`Página ${paginaAtual + 1}`}
               className="max-h-[calc(100vh-3rem)] max-w-full object-contain"
             />
-            {/* Zonas de clique invisíveis */}
             <button className="absolute left-0 top-0 w-1/3 h-full"
               onClick={() => setPaginaAtual((p) => Math.max(p - 1, 0))} />
             <button className="absolute right-0 top-0 w-1/3 h-full"
               onClick={() => setPaginaAtual((p) => Math.min(p + 1, paginas.length - 1))} />
 
-            {/* Barra inferior */}
             <div className="fixed bottom-6 left-0 right-0 flex justify-center pointer-events-none">
               <div className="flex items-center gap-3 bg-black/80 backdrop-blur rounded-full px-5 py-2.5 border border-white/10 pointer-events-auto">
                 <button onClick={() => setPaginaAtual((p) => Math.max(p - 1, 0))}
