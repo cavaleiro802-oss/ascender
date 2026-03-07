@@ -12,6 +12,7 @@ import LojaPage from "@/pages/LojaPage";
 import NotFound from "@/pages/NotFound";
 import Footer from "@/components/Footer";
 import LoginPage from "@/pages/LoginPage";
+import CarrinhoFlutuante from "@/components/CarrinhoFlutuante";
 
 export default function App() {
   return (
@@ -31,6 +32,7 @@ export default function App() {
         <Route component={NotFound} />
       </Switch>
       <Footer />
+      <CarrinhoFlutuante />
       <Toaster theme="dark" position="bottom-right" richColors />
     </>
   );
