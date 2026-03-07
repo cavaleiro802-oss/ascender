@@ -17,10 +17,10 @@ export default function CapituloPage() {
   const [cabecalhoVisivel, setCabecalhoVisivel] = useState(true);
   const [lastScroll, setLastScroll] = useState(0);
 
-  const { data: capitulo, isLoading } = trpc.capitulos.getById.useQuery(
+  const { data: capitulo, isLoading } = trpc.capitulos.byId.useQuery(
     { id: parseInt(capId) }, { enabled: !!capId }
   );
-  const { data: todosCapitulos = [] } = trpc.capitulos.listByObra.useQuery(
+  const { data: todosCapitulos = [] } = trpc.capitulos.list.useQuery(
     { obraId: parseInt(obraId) }, { enabled: !!obraId }
   );
   const registrarView = trpc.capitulos.incrementViews.useMutation();
