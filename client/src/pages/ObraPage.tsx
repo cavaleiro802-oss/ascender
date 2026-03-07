@@ -244,12 +244,14 @@ export default function ObraPage() {
       <Topbar />
 
       {/* Hero — capa full-width com blur */}
-      <div className="relative w-full" style={{ height: 280, overflow: "visible" }}>
-        {obra.coverUrl && (
-          <img src={obra.coverUrl} alt="" className="w-full h-full object-cover object-top blur-sm scale-110 opacity-30" />
+      <div className="relative w-full overflow-hidden" style={{ height: 280 }}>
+        {obra.coverUrl ? (
+          <img src={obra.coverUrl} alt="" className="w-full h-full object-cover object-top scale-110" style={{ filter: "blur(18px) brightness(0.25)" }} />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-b from-zinc-900 to-background" />
         )}
-        <div className="absolute inset-0 overflow-hidden bg-gradient-to-b from-transparent via-black/60 to-background" />
-        {/* Capa centralizada */}
+        <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/50 to-background" />
+        {/* Capa centralizada — sai do hero intencionalmente */}
         <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2 z-10">
           <div className="relative w-32 sm:w-40 aspect-[3/4] rounded-xl overflow-hidden border-2 border-border shadow-2xl shadow-black">
             {obra.coverUrl ? (
@@ -580,3 +582,4 @@ export default function ObraPage() {
     </div>
   );
 }
+
