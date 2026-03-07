@@ -31,7 +31,7 @@ const PROPAGANDAS = [
     titulo: "Onde leitores se tornam tradutores",
     subtitulo: "Junte-se à comunidade e contribua com traduções",
     btnLabel: "Quero ser Tradutor",
-    rota: "/pedido-cargo",
+    rota: "/perfil",
     gradient: "from-[#0d0010] via-[#110016] to-[#0a000d]",
     glow1: "bg-primary/10",
     glow2: "bg-purple-500/10",
@@ -42,11 +42,11 @@ const PROPAGANDAS = [
   {
     id: "loja",
     icon: "🛍",
-    tag: "EM BREVE",
+    tag: "ASCENDER LOJA",
     titulo: "Cosméticos e molduras exclusivas",
     subtitulo: "Personalize seu perfil com itens únicos da loja",
     btnLabel: "Ver Loja",
-    rota: null, // desabilitado até lançar
+    rota: "/loja",
     gradient: "from-[#000d10] via-[#001116] to-[#00080d]",
     glow1: "bg-blue-500/10",
     glow2: "bg-cyan-500/10",
@@ -72,6 +72,24 @@ function parseGenres(genres?: string | null): string[] {
 function PropagandaBanner({ onClose }: { onClose: () => void }) {
   const [, navigate] = useLocation();
   const [idx, setIdx] = useState(0);
+  const [animating, setAnimating] = useState(false);
+
+  useEffect(() => {
+    const t = setInterval(() => {
+      setAnimating(true);
+      setTimeout(() => {
+        setIdx((i) => (i + 1) % PROPAGANDAS.length);
+        setAnimating(false);
+      }, 300);
+    }, 5000);
+    return () => clearInterval(t);
+  }, []);
+
+  function goTo(i: number) {
+    if (i === idx) return;
+    setAnimating(true);
+    setTimeout(() => { setIdx(i); setAnimating(false); }, 300);
+  }
   const p = PROPAGANDAS[idx];
 
   return (
@@ -85,7 +103,7 @@ function PropagandaBanner({ onClose }: { onClose: () => void }) {
           <X className="w-4 h-4" />
         </button>
 
-        <div className="flex items-center gap-5 relative z-10">
+        <div className={`flex items-center gap-5 relative z-10 transition-opacity duration-300 ${animating ? "opacity-0" : "opacity-100"}`}>
           <div className="relative flex-shrink-0">
             <div className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center shadow-lg text-2xl sm:text-3xl">
               {p.icon}
@@ -100,9 +118,9 @@ function PropagandaBanner({ onClose }: { onClose: () => void }) {
           <div className="flex flex-col items-end gap-2 flex-shrink-0">
             <Button
               size="sm"
-              disabled={!p.rota}
-              className={`bg-gradient-to-r ${p.btnCls} text-white font-bold shadow-lg border-0 px-4 sm:px-5 ${!p.rota ? "opacity-60 cursor-not-allowed" : ""}`}
-              onClick={() => p.rota && navigate(p.rota)}
+              
+              className={`bg-gradient-to-r ${p.btnCls} text-white font-bold shadow-lg border-0 px-4 sm:px-5`}
+              onClick={() => navigate(p.rota!)}
             >
               {p.btnLabel}
             </Button>
@@ -110,7 +128,7 @@ function PropagandaBanner({ onClose }: { onClose: () => void }) {
             {PROPAGANDAS.length > 1 && (
               <div className="flex gap-1.5">
                 {PROPAGANDAS.map((_, i) => (
-                  <button key={i} onClick={() => setIdx(i)}
+                  <button key={i} onClick={() => goTo(i)}
                     className={`h-1.5 rounded-full transition-all ${i === idx ? "w-4 bg-white/60" : "w-1.5 bg-white/20"}`} />
                 ))}
               </div>
