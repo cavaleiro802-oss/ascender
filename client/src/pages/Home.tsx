@@ -228,6 +228,7 @@ function HeroBanner({ obras, onObraClick }: { obras: any[]; onObraClick: (id: nu
 
 // ─── Card de obra ─────────────────────────────────────────────────────────────
 function ObraCard({ obra, onClick }: { obra: any; onClick: () => void }) {
+  const [, navigate] = useLocation();
   const caps = obra.ultimosCapitulos ?? [];
   const genres = parseGenres(obra.genres);
 
@@ -265,7 +266,9 @@ function ObraCard({ obra, onClick }: { obra: any; onClick: () => void }) {
         {caps.length > 0 ? (
           <div className="space-y-1">
             {caps.slice(0, 3).map((cap: any) => (
-              <div key={cap.id} className="flex items-center justify-between text-[10px]" onClick={(e) => e.stopPropagation()}>
+              <div key={cap.id}
+                className="flex items-center justify-between text-[10px] hover:bg-white/5 rounded px-1 -mx-1 transition-colors cursor-pointer"
+                onClick={(e) => { e.stopPropagation(); navigate(`/obra/${obra.id}/capitulo/${cap.id}`); }}>
                 <span className="text-white/60 truncate">Cap. {cap.numero}</span>
                 {isNovo(cap.createdAt) ? (
                   <span className="bg-primary text-white text-[9px] font-black px-1.5 py-0.5 rounded flex-shrink-0">NOVO</span>
