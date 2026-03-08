@@ -254,6 +254,11 @@ function ObraCard({ obra, onClick }: { obra: any; onClick: () => void }) {
             <span className="text-[10px] text-white/80 font-medium">{genres[0]}</span>
           </div>
         )}
+        {caps.length > 0 && isNovo(caps[0].createdAt) && (
+          <div className="absolute top-2 right-2">
+            <span className="bg-green-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-lg">NEW</span>
+          </div>
+        )}
       </div>
       <div className="p-2">
         <p className="text-xs font-bold text-white leading-tight line-clamp-1 mb-1.5">{obra.title}</p>
@@ -501,4 +506,4 @@ export default function Home() {
       {showPedidoModal && <PedidoCargoModal onClose={() => setShowPedidoModal(false)} />}
     </div>
   );
-}
+      }
