@@ -49,9 +49,9 @@ export const LIMITS = {
   // Criar obra: 3 por dia por usuário
   criarObra: { maxRequests: 3, windowMs: 24 * 60 * 60_000 },
   // Criar capítulo: 10 por hora por usuário
-  criarCapitulo: { maxRequests: 10, windowMs: 60 * 60_000 },
+  criarCapitulo: { maxRequests: 50, windowMs: 60 * 60_000 },
   // Upload de imagem: 30 por hora por usuário
-  upload: { maxRequests: 30, windowMs: 60 * 60_000 },
+  upload: { maxRequests: 300, windowMs: 60 * 60_000 },
   // Login: 10 tentativas por 15 minutos por IP
   login: { maxRequests: 10, windowMs: 15 * 60_000 },
   // Views: 1 por capítulo por IP a cada 1 hora
