@@ -7,7 +7,7 @@ import {
   avaliarPedidoCargo, banUser, countCapitulosAguardando, countCurtidas,
   countNotificacoesNaoLidas, createCapitulo, createComentario, createObra,
   createReport, criarNotificacao, criarPedidoCargo, deletarSessao, deleteComentario,
-  getCapituloById, getComentarioById, getCurtida, getFavorito, getHistoricoLeitura,
+  deleteCapitulo, getCapituloById, getComentarioById, getCurtida, getFavorito, getHistoricoLeitura,
   getObraById, getPublicLink, getPlatformStats, getUserById, getUserByOpenId,
   incrementCapituloViews, incrementObraViews, listCapitulos, listComentarios,
   listFavoritos, listHistoricoAdm, listNotificacoes, listObras, listObrasByAuthor,
@@ -125,6 +125,24 @@ const obrasRouter = router({
     return { skipped: false };
   }),
 
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
+      const cap = await getCapituloById(input.id);
+      if (!cap) throw new TRPCError({ code: "NOT_FOUND" });
+      await deleteCapitulo(input.id);
+      await logAdm({ adminId: ctx.user.id, acao: "deletar_capitulo", targetType: "capitulo", targetId: input.id });
+      return { success: true };
+    }),
+
+  searchByObra: protectedProcedure
+    .input(z.object({ obraId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
+      return listCapitulos(input.obraId, true);
+    }),
+
   pending: protectedProcedure.query(({ ctx }) => {
     if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
     return listPendingObras();
@@ -196,6 +214,24 @@ const capitulosRouter = router({
     await incrementCapituloViews(input.id);
     return { skipped: false };
   }),
+
+  delete: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
+      const cap = await getCapituloById(input.id);
+      if (!cap) throw new TRPCError({ code: "NOT_FOUND" });
+      await deleteCapitulo(input.id);
+      await logAdm({ adminId: ctx.user.id, acao: "deletar_capitulo", targetType: "capitulo", targetId: input.id });
+      return { success: true };
+    }),
+
+  searchByObra: protectedProcedure
+    .input(z.object({ obraId: z.number() }))
+    .query(async ({ ctx, input }) => {
+      if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
+      return listCapitulos(input.obraId, true);
+    }),
 
   pending: protectedProcedure.query(({ ctx }) => {
     if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
