@@ -150,7 +150,38 @@ export async function listObras(opts: { status?: string; genre?: string; search?
   if (sort === "hot") query = query.orderBy(desc(obras.viewsWeek));
   else if (sort === "most") query = query.orderBy(desc(obras.viewsTotal));
   else query = query.orderBy(desc(obras.updatedAt));
-  return query.limit(limit).offset((page - 1) * limit);
+  const obrasList = await query.limit(limit).offset((page - 1) * limit);
+
+  // Buscar últimos 3 capítulos aprovados de cada obra
+  const obraIds = obrasList.map((o) => o.id);
+  if (obraIds.length === 0) return [];
+
+  const caps = await db
+    .select({
+      id: capitulos.id,
+      obraId: capitulos.obraId,
+      numero: capitulos.numero,
+      title: capitulos.title,
+      createdAt: capitulos.createdAt,
+    })
+    .from(capitulos)
+    .where(and(
+      sql`${capitulos.obraId} = ANY(ARRAY[${sql.join(obraIds.map(id => sql`${id}`), sql`, `)}]::int[])`,
+      eq(capitulos.status, "aprovado")
+    ))
+    .orderBy(desc(capitulos.createdAt));
+
+  // Agrupar 3 mais recentes por obra
+  const capsPorObra: Record<number, typeof caps> = {};
+  for (const cap of caps) {
+    if (!capsPorObra[cap.obraId]) capsPorObra[cap.obraId] = [];
+    if (capsPorObra[cap.obraId].length < 3) capsPorObra[cap.obraId].push(cap);
+  }
+
+  return obrasList.map((o) => ({
+    ...o,
+    ultimosCapitulos: capsPorObra[o.id] ?? [],
+  }));
 }
 export async function listObrasByAuthor(authorId: number) {
   const db = await getDb(); if (!db) return [];
