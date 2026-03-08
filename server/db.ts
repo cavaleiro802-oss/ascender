@@ -302,6 +302,11 @@ export async function createCapitulo(data: { obraId: number; authorId: number; n
   }
   return result[0];
 }
+export async function deleteCapitulo(id: number) {
+  const db = await getDb(); if (!db) return;
+  await db.delete(capitulos).where(eq(capitulos.id, id));
+}
+
 export async function countCapitulosAguardando(authorId: number) {
   const db = await getDb(); if (!db) return 0;
   const result = await db.select({ count: sql<number>`count(*)` }).from(capitulos).where(and(eq(capitulos.authorId, authorId), eq(capitulos.status, "aguardando")));
@@ -328,7 +333,33 @@ export async function listPendingCapitulos() {
 // ─── Comentários ─────────────────────────────────────────────────────────────
 export async function listComentarios(obraId: number) {
   const db = await getDb(); if (!db) return [];
-  return db.select().from(comentarios).where(and(eq(comentarios.obraId, obraId), eq(comentarios.deleted, false))).orderBy(desc(comentarios.createdAt));
+  const rows = await db
+    .select({
+      id:             comentarios.id,
+      obraId:         comentarios.obraId,
+      autorId:        comentarios.autorId,
+      parentId:       comentarios.parentId,
+      content:        comentarios.content,
+      createdAt:      comentarios.createdAt,
+      autorNome:      users.displayName,
+      autorAvatar:    users.avatarUrl,
+      parentAutorNome: sql<string | null>`NULL`,
+    })
+    .from(comentarios)
+    .leftJoin(users, eq(comentarios.autorId, users.id))
+    .where(and(eq(comentarios.obraId, obraId), eq(comentarios.deleted, false)))
+    .orderBy(desc(comentarios.createdAt));
+
+  // Mapear parentAutorNome
+  const autorPorId: Record<number, string> = {};
+  for (const r of rows) {
+    if (r.autorId && r.autorNome) autorPorId[r.autorId] = r.autorNome;
+  }
+  return rows.map((r) => ({
+    ...r,
+    autorNome: r.autorNome ?? `Usuário #${r.autorId}`,
+    parentAutorNome: r.parentId ? (autorPorId[r.parentId] ?? null) : null,
+  }));
 }
 export async function getComentarioById(id: number) {
   const db = await getDb(); if (!db) return undefined;
