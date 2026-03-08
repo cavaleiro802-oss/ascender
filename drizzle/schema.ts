@@ -10,6 +10,7 @@ export const roleEnum = pgEnum("role", [
 ]);
 export const obraStatusEnum    = pgEnum("obra_status",    ["em_espera", "aprovada", "rejeitada"]);
 export const obraAndamentoEnum = pgEnum("obra_andamento", ["em_andamento", "iato", "finalizado"]);
+export const obraTipoEnum    = pgEnum("obra_tipo",      ["manga", "novel"]);
 export const capStatusEnum     = pgEnum("cap_status",     ["aguardando", "aprovado", "rejeitado"]);
 export const reportTipoEnum    = pgEnum("report_tipo",    ["imagem_faltando", "cap_nao_carrega", "erro_traducao", "outro"]);
 export const pedidoTipoEnum    = pgEnum("pedido_tipo",    ["quero_aprender", "posso_ajudar"]);
