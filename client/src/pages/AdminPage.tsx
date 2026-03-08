@@ -76,6 +76,7 @@ export default function AdminPage() {
             <TabsTrigger value="stats"     className="data-[state=active]:bg-primary data-[state=active]:text-white"><BarChart3  className="w-4 h-4 mr-1.5" />Stats</TabsTrigger>
             <TabsTrigger value="obras"     className="data-[state=active]:bg-primary data-[state=active]:text-white"><BookOpen   className="w-4 h-4 mr-1.5" />Obras</TabsTrigger>
             <TabsTrigger value="capitulos" className="data-[state=active]:bg-primary data-[state=active]:text-white"><FileText   className="w-4 h-4 mr-1.5" />Capítulos</TabsTrigger>
+            <TabsTrigger value="gerenciar-caps" className="data-[state=active]:bg-primary data-[state=active]:text-white"><Trash2 className="w-4 h-4 mr-1.5" />Gerenciar Caps</TabsTrigger>
             <TabsTrigger value="usuarios"  className="data-[state=active]:bg-primary data-[state=active]:text-white"><Users      className="w-4 h-4 mr-1.5" />Usuários</TabsTrigger>
             <TabsTrigger value="pedidos"   className="data-[state=active]:bg-primary data-[state=active]:text-white relative">
               <UserCheck className="w-4 h-4 mr-1.5" />Pedidos de Cargo
@@ -96,6 +97,7 @@ export default function AdminPage() {
           <TabsContent value="stats">    <StatsTab /></TabsContent>
           <TabsContent value="obras">    <ObrasTab isSupreme={isSupreme} /></TabsContent>
           <TabsContent value="capitulos"><CapitulosTab /></TabsContent>
+          <TabsContent value="gerenciar-caps"><GerenciarCapsTab /></TabsContent>
           <TabsContent value="usuarios"> <UsuariosTab isSupreme={isSupreme} currentUserId={user.id} /></TabsContent>
           <TabsContent value="pedidos">  <AdminPedidosCargoTab /></TabsContent>
           <TabsContent value="reports">  <AdminReportsTab /></TabsContent>
@@ -210,6 +212,97 @@ function CapitulosTab() {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+
+// ─── Gerenciar Caps Tab ───────────────────────────────────────────────────────
+function GerenciarCapsTab() {
+  const utils = trpc.useUtils();
+  const [obraId, setObraId] = useState("");
+  const [buscando, setBuscando] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<any>(null);
+
+  const { data: caps = [], isLoading, refetch } = trpc.capitulos.searchByObra.useQuery(
+    { obraId: parseInt(obraId) },
+    { enabled: buscando && !!obraId && !isNaN(parseInt(obraId)) }
+  );
+
+  const deleteCap = trpc.capitulos.delete.useMutation({
+    onSuccess: () => {
+      utils.capitulos.searchByObra.invalidate();
+      toast.success("Capítulo deletado!");
+      setConfirmDelete(null);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  function buscar() {
+    if (!obraId || isNaN(parseInt(obraId))) return toast.error("ID da obra inválido.");
+    setBuscando(true);
+    refetch();
+  }
+
+  return (
+    <div className="space-y-4">
+      <h2 className="text-sm font-bold text-white/70 uppercase tracking-wider">Gerenciar Capítulos</h2>
+      <div className="flex gap-2">
+        <Input
+          type="number"
+          placeholder="ID da obra (ex: 5)"
+          value={obraId}
+          onChange={(e) => { setObraId(e.target.value); setBuscando(false); }}
+          className="bg-secondary border-border text-white max-w-xs"
+          onKeyDown={(e) => e.key === "Enter" && buscar()}
+        />
+        <Button onClick={buscar} className="bg-primary text-white">Buscar</Button>
+      </div>
+
+      {isLoading && <p className="text-muted-foreground text-sm">Carregando...</p>}
+
+      {buscando && !isLoading && caps.length === 0 && (
+        <div className="asc-card p-8 text-center text-muted-foreground">Nenhum capítulo encontrado para essa obra.</div>
+      )}
+
+      {caps.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground">{caps.length} capítulo{caps.length !== 1 ? "s" : ""} encontrado{caps.length !== 1 ? "s" : ""}</p>
+          {caps.map((cap: any) => (
+            <div key={cap.id} className="asc-card p-3 flex items-center justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-white">Cap. {cap.numero}{cap.title ? ` — ${cap.title}` : ""}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  ID: {cap.id} • {cap.status === "aprovado" ? "✅ Aprovado" : cap.status === "aguardando" ? "⏳ Pendente" : "❌ Rejeitado"} • {new Date(cap.createdAt).toLocaleDateString("pt-BR")}
+                </p>
+              </div>
+              <Button size="sm" variant="outline"
+                className="border-red-500/40 text-red-400 hover:bg-red-500/10 bg-transparent flex-shrink-0"
+                onClick={() => setConfirmDelete(cap)}>
+                <Trash2 className="w-3.5 h-3.5 mr-1" />Deletar
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <AlertDialog open={!!confirmDelete} onOpenChange={(o) => !o && setConfirmDelete(null)}>
+        <AlertDialogContent className="bg-background border-border">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white">Deletar capítulo?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Cap. {confirmDelete?.numero}{confirmDelete?.title ? ` — ${confirmDelete.title}` : ""} será deletado permanentemente. As imagens no R2 não serão removidas automaticamente.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="border-border text-white/70">Cancelar</AlertDialogCancel>
+            <AlertDialogAction className="bg-red-600 hover:bg-red-700 text-white"
+              onClick={() => confirmDelete && deleteCap.mutate({ id: confirmDelete.id })}>
+              Deletar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
