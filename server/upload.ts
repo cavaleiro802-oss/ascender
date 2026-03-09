@@ -1,127 +1,118 @@
-import { Router } from "express";
-import multer from "multer";
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
-import { v4 as uuid } from "uuid";
-import { checkRateLimit, LIMITS } from "./rateLimit";
-import { getSessao, getUserByOpenId } from "./db";
+import { useState } from "react";
 
-const uploadRouter = Router();
-
-const ROLES_TRADUTOR = ["tradutor_aprendiz", "tradutor_oficial", "admin_senhor", "admin_supremo"];
-const ALLOWED_TYPES = ["image/jpeg", "image/jpg", "image/png", "image/webp"];
-const MAX_SIZE = 10 * 1024 * 1024;
-
-const r2 = new S3Client({
-  region: "auto",
-  endpoint: process.env.R2_ENDPOINT!,
-  credentials: {
-    accessKeyId: process.env.R2_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.R2_SECRET_ACCESS_KEY!,
-  },
-});
-
-const BUCKET = process.env.R2_BUCKET ?? "ascender-imagens";
-const PUBLIC_URL = process.env.R2_PUBLIC_URL!;
-
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: MAX_SIZE },
-  fileFilter: (_req, file, cb) => {
-    if (ALLOWED_TYPES.includes(file.mimetype)) cb(null, true);
-    else cb(new Error("Tipo de arquivo não permitido. Use JPG, PNG ou WebP."));
-  },
-});
-
-async function getUser(req: any) {
-  const sessionId = req.cookies?.["asc_session"];
-  if (!sessionId || typeof sessionId !== "string" || sessionId.length !== 64) return null;
-  const sessao = await getSessao(sessionId);
-  if (!sessao) return null;
-  return getUserByOpenId(sessao.openId);
+interface UploadResult {
+  publicUrl: string;
+  key: string;
 }
 
-async function enviarParaR2(buffer: Buffer, mimetype: string, pasta: string) {
-  console.log("[R2] endpoint:", process.env.R2_ENDPOINT);
-  console.log("[R2] bucket:", BUCKET);
-  console.log("[R2] accessKeyId:", process.env.R2_ACCESS_KEY_ID?.slice(0, 8) + "...");
+// ─── Upload de capa ───────────────────────────────────────────────────────────
+export async function uploadCapa(file: File): Promise<UploadResult> {
+  const form = new FormData();
+  form.append("file", file);
 
-  const ext = mimetype.split("/")[1].replace("jpeg", "jpg");
-  const key = `${pasta}/${uuid()}.${ext}`;
+  const res = await fetch("/api/upload/capa", {
+    method: "POST",
+    credentials: "include",
+    body: form,
+  });
 
-  await r2.send(new PutObjectCommand({
-    Bucket: BUCKET,
-    Key: key,
-    Body: buffer,
-    ContentType: mimetype,
-  }));
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || "Erro ao enviar capa");
+  }
 
-  return {
-    key,
-    publicUrl: `${PUBLIC_URL}/${key}`,
-  };
+  return res.json();
 }
 
-uploadRouter.post("/capa", upload.single("file"), async (req, res) => {
-  try {
-    const user = await getUser(req);
-    if (!user) return res.status(401).json({ error: "Faça login primeiro." });
-    if (user.banned || user.bannedTotal) return res.status(403).json({ error: "Conta suspensa." });
-    if (!ROLES_TRADUTOR.includes(user.role)) return res.status(403).json({ error: "Somente tradutores podem enviar capas." });
+// ─── Upload de múltiplas páginas ──────────────────────────────────────────────
+export async function uploadPaginas(
+  files: File[],
+  onProgress?: (atual: number, total: number) => void
+): Promise<UploadResult[]> {
+  const results: UploadResult[] = [];
+  const BATCH = 20;
 
-    const rl = checkRateLimit({ key: `upload:${user.id}`, ...LIMITS.upload });
-    if (!rl.allowed) return res.status(429).json({ error: `Muitos uploads. Tente em ${rl.retryAfterSec}s.` });
+  for (let i = 0; i < files.length; i += BATCH) {
+    const batch = files.slice(i, i + BATCH);
+    const form = new FormData();
+    batch.forEach((f) => form.append("files", f));
 
-    if (!req.file) return res.status(400).json({ error: "Arquivo obrigatório." });
+    const res = await fetch("/api/upload/paginas", {
+      method: "POST",
+      credentials: "include",
+      body: form,
+    });
 
-    const result = await enviarParaR2(req.file.buffer, req.file.mimetype, "capas");
-    res.json(result);
-  } catch (e: any) {
-    console.error("[Upload capa] erro:", e.message);
-    res.status(400).json({ error: e.message });
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || `Erro ao enviar páginas ${i + 1}–${i + batch.length}`);
+    }
+
+    const { urls } = await res.json() as { urls: UploadResult[] };
+    urls.forEach((u, j) => { results[i + j] = u; });
+
+    onProgress?.(Math.min(i + BATCH, files.length), files.length);
   }
-});
 
-uploadRouter.post("/paginas", upload.array("files", 100), async (req, res) => {
-  try {
-    const user = await getUser(req);
-    if (!user) return res.status(401).json({ error: "Faça login primeiro." });
-    if (user.banned || user.bannedTotal) return res.status(403).json({ error: "Conta suspensa." });
-    if (!ROLES_TRADUTOR.includes(user.role)) return res.status(403).json({ error: "Somente tradutores podem enviar páginas." });
+  return results;
+}
 
-    const rl = checkRateLimit({ key: `upload:${user.id}`, ...LIMITS.upload });
-    if (!rl.allowed) return res.status(429).json({ error: `Muitos uploads. Tente em ${rl.retryAfterSec}s.` });
+// ─── Upload de avatar ─────────────────────────────────────────────────────────
+export async function uploadAvatar(file: File): Promise<UploadResult> {
+  const form = new FormData();
+  form.append("file", file);
 
-    const files = req.files as Express.Multer.File[];
-    if (!files || files.length === 0) return res.status(400).json({ error: "Nenhum arquivo enviado." });
+  const res = await fetch("/api/upload/avatar", {
+    method: "POST",
+    credentials: "include",
+    body: form,
+  });
 
-    const urls = await Promise.all(
-      files.map((f) => enviarParaR2(f.buffer, f.mimetype, "paginas"))
-    );
-
-    res.json({ urls });
-  } catch (e: any) {
-    console.error("[Upload paginas] erro:", e.message);
-    res.status(400).json({ error: e.message });
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err.error || "Erro ao enviar avatar");
   }
-});
 
-uploadRouter.post("/avatar", upload.single("file"), async (req, res) => {
-  try {
-    const user = await getUser(req);
-    if (!user) return res.status(401).json({ error: "Faça login primeiro." });
-    if (user.bannedTotal) return res.status(403).json({ error: "Conta suspensa." });
+  return res.json();
+}
 
-    const rl = checkRateLimit({ key: `upload:${user.id}`, ...LIMITS.upload });
-    if (!rl.allowed) return res.status(429).json({ error: `Muitos uploads. Tente em ${rl.retryAfterSec}s.` });
+// ─── Hook para upload com estado ──────────────────────────────────────────────
+export function useUpload() {
+  const [uploading, setUploading] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
-    if (!req.file) return res.status(400).json({ error: "Arquivo obrigatório." });
-
-    const result = await enviarParaR2(req.file.buffer, req.file.mimetype, "avatars");
-    res.json(result);
-  } catch (e: any) {
-    console.error("[Upload avatar] erro:", e.message);
-    res.status(400).json({ error: e.message });
+  async function uploadArquivo(file: File, tipo: "capa" | "avatar"): Promise<UploadResult | null> {
+    setUploading(true);
+    setError(null);
+    try {
+      const fn = tipo === "capa" ? uploadCapa : uploadAvatar;
+      return await fn(file);
+    } catch (e: any) {
+      setError(e.message);
+      return null;
+    } finally {
+      setUploading(false);
+    }
   }
-});
 
-export default uploadRouter;
+  async function uploadCapitulo(files: File[]): Promise<UploadResult[] | null> {
+    setUploading(true);
+    setProgress(0);
+    setError(null);
+    try {
+      return await uploadPaginas(files, (atual, total) => {
+        setProgress(Math.round((atual / total) * 100));
+      });
+    } catch (e: any) {
+      setError(e.message);
+      return null;
+    } finally {
+      setUploading(false);
+      setProgress(0);
+    }
+  }
+
+  return { uploading, progress, error, uploadArquivo, uploadCapitulo };
+}
+
