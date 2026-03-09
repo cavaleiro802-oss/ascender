@@ -20,59 +20,146 @@ interface CapLote {
   erro?: string;
 }
 
-// ─── Extrai zip no browser usando fflate via CDN ──────────────────────────────
-async function extrairZip(file: File): Promise<CapLote[]> {
-  // Carregar fflate dinamicamente
-  const fflate = await import("https://cdn.jsdelivr.net/npm/fflate@0.8.2/esm/browser.js" as any);
+// ─── Extrai zip no browser — nativo, sem dependências externas ────────────────
+// Leitor de ZIP nativo — sem bibliotecas externas
+// Baseado na especificação do formato ZIP (PKZIP)
 
-  const buffer = await file.arrayBuffer();
-  const uint8 = new Uint8Array(buffer);
+async function lerZipEntradas(buffer: ArrayBuffer): Promise<{ path: string; data: Uint8Array }[]> {
+  const view = new DataView(buffer);
+  const bytes = new Uint8Array(buffer);
+  const resultados: { path: string; data: Uint8Array }[] = [];
 
-  return new Promise((resolve, reject) => {
-    fflate.unzip(uint8, (err: any, files: Record<string, Uint8Array>) => {
-      if (err) return reject(new Error("ZIP inválido ou corrompido."));
+  // Procurar End of Central Directory (signature 0x06054b50)
+  let eocdOffset = -1;
+  for (let i = bytes.length - 22; i >= 0; i--) {
+    if (view.getUint32(i, true) === 0x06054b50) { eocdOffset = i; break; }
+  }
+  if (eocdOffset === -1) throw new Error("ZIP inválido: EOCD não encontrado.");
 
-      // Agrupar por pasta
-      const grupos: Record<string, File[]> = {};
-      const IMGS = ["jpg", "jpeg", "png", "webp"];
+  const entradas = view.getUint16(eocdOffset + 8, true);
+  const cdOffset  = view.getUint32(eocdOffset + 16, true);
 
-      for (const [path, data] of Object.entries(files)) {
-        if (data.length === 0) continue; // é pasta
-        const partes = path.split("/").filter(Boolean);
-        if (partes.length < 2) continue; // arquivo na raiz, ignora
-        const pasta = partes[0];
-        const nome = partes[partes.length - 1];
-        const ext = nome.split(".").pop()?.toLowerCase() ?? "";
-        if (!IMGS.includes(ext)) continue;
+  let pos = cdOffset;
+  for (let i = 0; i < entradas; i++) {
+    if (view.getUint32(pos, true) !== 0x02014b50) break; // Central Dir signature
 
-        const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg"
-          : ext === "png" ? "image/png" : "image/webp";
-        const blob = new Blob([data], { type: mime });
-        const f = new File([blob], nome, { type: mime });
+    const flags        = view.getUint16(pos + 8,  true);
+    const method       = view.getUint16(pos + 10, true);
+    const compSize     = view.getUint32(pos + 20, true);
+    const uncompSize   = view.getUint32(pos + 24, true);
+    const nameLen      = view.getUint16(pos + 28, true);
+    const extraLen     = view.getUint16(pos + 30, true);
+    const commentLen   = view.getUint16(pos + 32, true);
+    const localOffset  = view.getUint32(pos + 42, true);
 
-        if (!grupos[pasta]) grupos[pasta] = [];
-        grupos[pasta].push(f);
+    const decoder = (flags & 0x800) ? new TextDecoder("utf-8") : new TextDecoder("cp437");
+    const path = decoder.decode(bytes.slice(pos + 46, pos + 46 + nameLen));
+    pos += 46 + nameLen + extraLen + commentLen;
+
+    if (path.endsWith("/") || uncompSize === 0) continue; // é pasta
+
+    // Ir para o Local File Header
+    const lhPos    = localOffset;
+    const lhNameLen  = view.getUint16(lhPos + 26, true);
+    const lhExtraLen = view.getUint16(lhPos + 28, true);
+    const dataStart  = lhPos + 30 + lhNameLen + lhExtraLen;
+    const compData   = bytes.slice(dataStart, dataStart + compSize);
+
+    let data: Uint8Array;
+    if (method === 0) {
+      // Stored (sem compressão)
+      data = compData;
+    } else if (method === 8) {
+      // Deflate
+      const ds = new DecompressionStream("deflate-raw");
+      const writer = ds.writable.getWriter();
+      const reader = ds.readable.getReader();
+      writer.write(compData);
+      writer.close();
+      const chunks: Uint8Array[] = [];
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        chunks.push(value);
       }
+      const total = chunks.reduce((s, c) => s + c.length, 0);
+      data = new Uint8Array(total);
+      let off = 0;
+      for (const c of chunks) { data.set(c, off); off += c.length; }
+    } else {
+      continue; // método não suportado, pula
+    }
 
-      const caps: CapLote[] = Object.entries(grupos)
-        .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
-        .map(([pasta, arquivos]) => {
-          // Ordenar imagens por nome
-          arquivos.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-          // Tentar extrair número da pasta (ex: "cap1", "capitulo_02", "1")
-          const match = pasta.match(/(\d+(?:\.\d+)?)/);
-          const numero = match ? match[1] : "";
-          const previews = arquivos.map((f) => URL.createObjectURL(f));
-          return { pasta, numero, arquivos, previews, status: "pendente" as const };
-        });
+    resultados.push({ path, data });
+  }
 
-      if (caps.length === 0) {
-        return reject(new Error("Nenhuma imagem encontrada. Organize em pastas (cap1/, cap2/...)."));
-      }
-      resolve(caps);
-    });
-  });
+  return resultados;
 }
+
+async function extrairZip(file: File): Promise<CapLote[]> {
+  const buffer = await file.arrayBuffer();
+  const entradas = await lerZipEntradas(buffer);
+
+  const IMGS = ["jpg", "jpeg", "png", "webp"];
+  const grupos: Record<string, File[]> = {};
+
+  for (const { path, data } of entradas) {
+    const partes = path.split("/").filter(Boolean);
+    if (partes.length < 2) continue; // arquivo na raiz, ignora
+    const pasta = partes[0];
+    const nome = partes[partes.length - 1];
+    const ext = nome.split(".").pop()?.toLowerCase() ?? "";
+    if (!IMGS.includes(ext)) continue;
+
+    const mime = (ext === "jpg" || ext === "jpeg") ? "image/jpeg"
+      : ext === "png" ? "image/png" : "image/webp";
+    const blob = new Blob([data], { type: mime });
+    const f = new File([blob], nome, { type: mime });
+
+    if (!grupos[pasta]) grupos[pasta] = [];
+    grupos[pasta].push(f);
+  }
+
+  const caps: CapLote[] = Object.entries(grupos)
+    .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+    .map(([pasta, arquivos]) => {
+      arquivos.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+      const match = pasta.match(/(\d+(?:\.\d+)?)/);
+      const numero = match ? match[1] : "";
+      const previews = arquivos.map((f) => URL.createObjectURL(f));
+      return { pasta, numero, arquivos, previews, status: "pendente" as const };
+    });
+
+  if (caps.length === 0) {
+    // Tentar CBZ flat (todas imagens na raiz, sem subpastas)
+    const imgsRaiz = entradas.filter(({ path }) => {
+      const partes = path.split("/").filter(Boolean);
+      if (partes.length !== 1) return false;
+      const ext = partes[0].split(".").pop()?.toLowerCase() ?? "";
+      return IMGS.includes(ext);
+    });
+
+    if (imgsRaiz.length > 0) {
+      // CBZ com imagens na raiz = 1 capítulo
+      const arquivos = imgsRaiz
+        .sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true }))
+        .map(({ path, data }) => {
+          const ext = path.split(".").pop()?.toLowerCase() ?? "jpg";
+          const mime = (ext === "jpg" || ext === "jpeg") ? "image/jpeg"
+            : ext === "png" ? "image/png" : "image/webp";
+          return new File([new Blob([data], { type: mime })], path, { type: mime });
+        });
+      const previews = arquivos.map((f) => URL.createObjectURL(f));
+      const match = file.name.match(/(\d+(?:\.\d+)?)/);
+      return [{ pasta: file.name, numero: match ? match[1] : "", arquivos, previews, status: "pendente" as const }];
+    }
+
+    throw new Error("Nenhuma imagem encontrada. Organize em pastas (cap1/, cap2/...) ou use CBZ com imagens na raiz.");
+  }
+
+  return caps;
+}
+
 
 // ─── Aba cap único ─────────────────────────────────────────────────────────────
 function AbaUnico({ obraId }: { obraId: string }) {
@@ -224,18 +311,22 @@ function AbaLote({ obraId }: { obraId: string }) {
   const criar = trpc.capitulos.create.useMutation({ onError: (e) => toast.error(e.message) });
   const { uploadCapitulo } = useUpload();
 
-  async function handleZip(file: File) {
+  async function handleZips(files: FileList) {
     setExtraindo(true);
     setCaps([]);
-    try {
-      const resultado = await extrairZip(file);
-      setCaps(resultado);
-      toast.success(`${resultado.length} capítulo${resultado.length !== 1 ? "s" : ""} detectado${resultado.length !== 1 ? "s" : ""}!`);
-    } catch (e: any) {
-      toast.error(e.message);
-    } finally {
-      setExtraindo(false);
+    const todos: CapLote[] = [];
+    for (let i = 0; i < files.length; i++) {
+      try {
+        const resultado = await extrairZip(files[i]);
+        todos.push(...resultado);
+      } catch (e: any) {
+        toast.error(`${files[i].name}: ${e.message}`);
+      }
     }
+    todos.sort((a, b) => parseFloat(a.numero || "0") - parseFloat(b.numero || "0"));
+    setCaps(todos);
+    if (todos.length > 0) toast.success(`${todos.length} capítulo${todos.length !== 1 ? "s" : ""} detectado${todos.length !== 1 ? "s" : ""}!`);
+    setExtraindo(false);
   }
 
   function atualizarNumero(idx: number, valor: string) {
@@ -310,12 +401,12 @@ function AbaLote({ obraId }: { obraId: string }) {
               <p className="text-sm text-white/70">Extraindo ZIP...</p></>
           ) : (
             <><Package className="w-8 h-8 text-white/20 group-hover:text-primary/50 mx-auto mb-2 transition-colors" />
-              <p className="text-sm text-muted-foreground">Clique para selecionar o arquivo ZIP</p>
-              <p className="text-xs text-muted-foreground mt-1">ZIP ou CBZ • Máx. 500MB</p></>
+              <p className="text-sm text-muted-foreground">Clique para selecionar ZIP ou CBZ</p>
+              <p className="text-xs text-muted-foreground mt-1">Vários arquivos de uma vez • ZIP ou CBZ • Máx. 500MB cada</p></>
           )}
         </div>
-        <input ref={zipRef} type="file" accept=".zip,.cbz" className="hidden"
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleZip(f); }} />
+        <input ref={zipRef} type="file" accept=".zip,.cbz" multiple className="hidden"
+          onChange={(e) => { const files = e.target.files; if (files && files.length > 0) handleZips(files); }} />
       </div>
 
       {/* Lista de caps detectados */}
