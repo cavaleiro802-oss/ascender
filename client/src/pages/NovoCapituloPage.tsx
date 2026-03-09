@@ -52,7 +52,7 @@ async function lerZipEntradas(buffer: ArrayBuffer): Promise<{ path: string; data
     const commentLen   = view.getUint16(pos + 32, true);
     const localOffset  = view.getUint32(pos + 42, true);
 
-    const decoder = (flags & 0x800) ? new TextDecoder("utf-8") : new TextDecoder("cp437");
+    const decoder = new TextDecoder("utf-8");
     const path = decoder.decode(bytes.slice(pos + 46, pos + 46 + nameLen));
     pos += 46 + nameLen + extraLen + commentLen;
 
