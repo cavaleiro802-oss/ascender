@@ -343,9 +343,10 @@ function AbaLote({ obraId }: { obraId: string }) {
     setEnviando(true);
     setProgresso({ atual: 0, total: caps.length });
     let sucessos = 0;
+    let concluidos = 0;
+    const PARALELO = 3; // 3 caps simultâneos
 
-    for (let i = 0; i < caps.length; i++) {
-      const cap = caps[i];
+    async function enviarCap(cap: CapLote, i: number) {
       setCaps((prev) => prev.map((c, idx) => idx === i ? { ...c, status: "enviando" } : c));
       try {
         const resultados = await uploadCapitulo(cap.arquivos);
@@ -361,7 +362,14 @@ function AbaLote({ obraId }: { obraId: string }) {
       } catch (e: any) {
         setCaps((prev) => prev.map((c, idx) => idx === i ? { ...c, status: "erro", erro: e.message } : c));
       }
-      setProgresso({ atual: i + 1, total: caps.length });
+      concluidos++;
+      setProgresso({ atual: concluidos, total: caps.length });
+    }
+
+    // Enviar em grupos de PARALELO
+    for (let i = 0; i < caps.length; i += PARALELO) {
+      const grupo = caps.slice(i, i + PARALELO).map((cap, j) => enviarCap(cap, i + j));
+      await Promise.all(grupo);
     }
 
     setEnviando(false);
