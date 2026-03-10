@@ -302,6 +302,11 @@ export async function createCapitulo(data: { obraId: number; authorId: number; n
   }
   return result[0];
 }
+export async function updateCapituloNumero(id: number, numero: number) {
+  const db = await getDb(); if (!db) return;
+  await db.update(capitulos).set({ numero }).where(eq(capitulos.id, id));
+}
+
 export async function deleteCapitulo(id: number) {
   const db = await getDb(); if (!db) return;
   await db.delete(capitulos).where(eq(capitulos.id, id));
