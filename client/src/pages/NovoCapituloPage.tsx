@@ -1,4 +1,5 @@
 import { useState, useRef, useCallback } from "react";
+import { unzip } from "fflate";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/useAuth";
@@ -20,147 +21,71 @@ interface CapLote {
   erro?: string;
 }
 
-// ─── Extrai zip no browser — nativo, sem dependências externas ────────────────
-// Leitor de ZIP nativo — sem bibliotecas externas
-// Baseado na especificação do formato ZIP (PKZIP)
-
-async function lerZipEntradas(buffer: ArrayBuffer): Promise<{ path: string; data: Uint8Array }[]> {
-  const view = new DataView(buffer);
-  const bytes = new Uint8Array(buffer);
-  const resultados: { path: string; data: Uint8Array }[] = [];
-
-  // Procurar End of Central Directory (signature 0x06054b50)
-  let eocdOffset = -1;
-  for (let i = bytes.length - 22; i >= 0; i--) {
-    if (view.getUint32(i, true) === 0x06054b50) { eocdOffset = i; break; }
-  }
-  if (eocdOffset === -1) throw new Error("ZIP inválido: EOCD não encontrado.");
-
-  const entradas = view.getUint16(eocdOffset + 8, true);
-  const cdOffset  = view.getUint32(eocdOffset + 16, true);
-
-  let pos = cdOffset;
-  for (let i = 0; i < entradas; i++) {
-    if (view.getUint32(pos, true) !== 0x02014b50) break; // Central Dir signature
-
-    const flags        = view.getUint16(pos + 8,  true);
-    const method       = view.getUint16(pos + 10, true);
-    const compSize     = view.getUint32(pos + 20, true);
-    const uncompSize   = view.getUint32(pos + 24, true);
-    const nameLen      = view.getUint16(pos + 28, true);
-    const extraLen     = view.getUint16(pos + 30, true);
-    const commentLen   = view.getUint16(pos + 32, true);
-    const localOffset  = view.getUint32(pos + 42, true);
-
-    const decoder = new TextDecoder("utf-8");
-    const path = decoder.decode(bytes.slice(pos + 46, pos + 46 + nameLen));
-    pos += 46 + nameLen + extraLen + commentLen;
-
-    if (path.endsWith("/") || uncompSize === 0) continue; // é pasta
-
-    // Ir para o Local File Header
-    const lhPos    = localOffset;
-    const lhNameLen  = view.getUint16(lhPos + 26, true);
-    const lhExtraLen = view.getUint16(lhPos + 28, true);
-    const dataStart  = lhPos + 30 + lhNameLen + lhExtraLen;
-    const compData   = bytes.slice(dataStart, dataStart + compSize);
-
-    let data: Uint8Array;
-    if (method === 0) {
-      // Stored (sem compressão)
-      data = compData;
-    } else if (method === 8) {
-      // Deflate
-      const ds = new DecompressionStream("deflate-raw");
-      const writer = ds.writable.getWriter();
-      const reader = ds.readable.getReader();
-      writer.write(compData);
-      writer.close();
-      const chunks: Uint8Array[] = [];
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        chunks.push(value);
-      }
-      const total = chunks.reduce((s, c) => s + c.length, 0);
-      data = new Uint8Array(total);
-      let off = 0;
-      for (const c of chunks) { data.set(c, off); off += c.length; }
-    } else {
-      continue; // método não suportado, pula
-    }
-
-    resultados.push({ path, data });
-  }
-
-  return resultados;
-}
-
+// ─── Extrai zip/cbz no browser usando fflate ─────────────────────────────────
 async function extrairZip(file: File): Promise<CapLote[]> {
   const buffer = await file.arrayBuffer();
-  const entradas = await lerZipEntradas(buffer);
+  const uint8 = new Uint8Array(buffer);
 
-  const IMGS = ["jpg", "jpeg", "png", "webp"];
-  const grupos: Record<string, File[]> = {};
+  return new Promise((resolve, reject) => {
+    unzip(uint8, (err, files) => {
+      if (err) return reject(new Error("ZIP/CBZ inválido ou corrompido."));
 
-  for (const { path, data } of entradas) {
-    const partes = path.split("/").filter(Boolean);
-    if (partes.length < 2) continue; // arquivo na raiz, ignora
-    const pasta = partes[0];
-    const nome = partes[partes.length - 1];
-    const ext = nome.split(".").pop()?.toLowerCase() ?? "";
-    if (!IMGS.includes(ext)) continue;
+      const IMGS = ["jpg", "jpeg", "png", "webp"];
+      const grupos: Record<string, File[]> = {};
+      const imgsRaiz: File[] = [];
 
-    const mime = (ext === "jpg" || ext === "jpeg") ? "image/jpeg"
-      : ext === "png" ? "image/png" : "image/webp";
-    const blob = new Blob([data], { type: mime });
-    const f = new File([blob], nome, { type: mime });
+      for (const [path, data] of Object.entries(files)) {
+        if (data.length === 0) continue;
+        const partes = path.split("/").filter(Boolean);
+        const nome = partes[partes.length - 1];
+        const ext = nome.split(".").pop()?.toLowerCase() ?? "";
+        if (!IMGS.includes(ext)) continue;
 
-    if (!grupos[pasta]) grupos[pasta] = [];
-    grupos[pasta].push(f);
-  }
+        const mime = (ext === "jpg" || ext === "jpeg") ? "image/jpeg"
+          : ext === "png" ? "image/png" : "image/webp";
+        const f = new File([new Blob([data], { type: mime })], nome, { type: mime });
 
-  const caps: CapLote[] = Object.entries(grupos)
-    .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
-    .map(([pasta, arquivos]) => {
-      arquivos.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-      const match = pasta.match(/(\d+(?:\.\d+)?)/);
-      const numero = match ? match[1] : "";
-      // Só gera preview da primeira imagem (evita OOM no Android com muitos caps)
-      const previews = arquivos.slice(0, 1).map((f) => URL.createObjectURL(f));
-      return { pasta, numero, arquivos, previews, status: "pendente" as const };
-    });
+        if (partes.length === 1) {
+          // Imagem na raiz (CBZ flat)
+          imgsRaiz.push(f);
+        } else {
+          const pasta = partes[0];
+          if (!grupos[pasta]) grupos[pasta] = [];
+          grupos[pasta].push(f);
+        }
+      }
 
-  if (caps.length === 0) {
-    // Tentar CBZ flat (todas imagens na raiz, sem subpastas)
-    const imgsRaiz = entradas.filter(({ path }) => {
-      const partes = path.split("/").filter(Boolean);
-      if (partes.length !== 1) return false;
-      const ext = partes[0].split(".").pop()?.toLowerCase() ?? "";
-      return IMGS.includes(ext);
-    });
+      // CBZ flat: todas as imagens na raiz = 1 capítulo
+      if (Object.keys(grupos).length === 0 && imgsRaiz.length > 0) {
+        imgsRaiz.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+        const match = file.name.match(/(\d+(?:\.\d+)?)/);
+        const preview = [URL.createObjectURL(imgsRaiz[0])];
+        return resolve([{
+          pasta: file.name,
+          numero: match ? match[1] : "",
+          arquivos: imgsRaiz,
+          previews: preview,
+          status: "pendente",
+        }]);
+      }
 
-    if (imgsRaiz.length > 0) {
-      // CBZ com imagens na raiz = 1 capítulo
-      const arquivos = imgsRaiz
-        .sort((a, b) => a.path.localeCompare(b.path, undefined, { numeric: true }))
-        .map(({ path, data }) => {
-          const ext = path.split(".").pop()?.toLowerCase() ?? "jpg";
-          const mime = (ext === "jpg" || ext === "jpeg") ? "image/jpeg"
-            : ext === "png" ? "image/png" : "image/webp";
-          return new File([new Blob([data], { type: mime })], path, { type: mime });
+      const caps: CapLote[] = Object.entries(grupos)
+        .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
+        .map(([pasta, arquivos]) => {
+          arquivos.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+          const match = pasta.match(/(\d+(?:\.\d+)?)/);
+          const previews = [URL.createObjectURL(arquivos[0])];
+          return { pasta, numero: match ? match[1] : "", arquivos, previews, status: "pendente" as const };
         });
-      const previews = arquivos.slice(0, 1).map((f) => URL.createObjectURL(f));
-      const match = file.name.match(/(\d+(?:\.\d+)?)/);
-      return [{ pasta: file.name, numero: match ? match[1] : "", arquivos, previews, status: "pendente" as const }];
-    }
 
-    throw new Error("Nenhuma imagem encontrada. Organize em pastas (cap1/, cap2/...) ou use CBZ com imagens na raiz.");
-  }
+      if (caps.length === 0) {
+        return reject(new Error("Nenhuma imagem encontrada. Organize em pastas (cap1/, cap2/...) ou use CBZ com imagens na raiz."));
+      }
 
-  return caps;
+      resolve(caps);
+    });
+  });
 }
-
 
 // ─── Aba cap único ─────────────────────────────────────────────────────────────
 function AbaUnico({ obraId }: { obraId: string }) {
