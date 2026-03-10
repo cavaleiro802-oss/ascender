@@ -7,7 +7,7 @@ import {
   avaliarPedidoCargo, banUser, countCapitulosAguardando, countCurtidas,
   countNotificacoesNaoLidas, createCapitulo, createComentario, createObra,
   createReport, criarNotificacao, criarPedidoCargo, deletarSessao, deleteComentario,
-  deleteCapitulo, getCapituloById, getComentarioById, getCurtida, getFavorito, getHistoricoLeitura,
+  deleteCapitulo, getCapituloById, getComentarioById, getCurtida, getFavorito, getHistoricoLeitura, updateCapituloNumero,
   getObraById, getPublicLink, getPlatformStats, getUserById, getUserByOpenId,
   incrementCapituloViews, incrementObraViews, listCapitulos, listComentarios,
   listFavoritos, listHistoricoAdm, listNotificacoes, listObras, listObrasByAuthor,
@@ -231,6 +231,19 @@ const capitulosRouter = router({
     .query(async ({ ctx, input }) => {
       if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
       return listCapitulos(input.obraId, true);
+    }),
+
+  updateNumero: protectedProcedure
+    .input(z.object({ id: z.number(), numero: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const cap = await getCapituloById(input.id);
+      if (!cap) throw new TRPCError({ code: "NOT_FOUND" });
+      const obra = await getObraById(cap.obraId);
+      const isAuthor = obra?.authorId === ctx.user.id;
+      const isAdminUser = isAdmin(ctx.user.role);
+      if (!isAuthor && !isAdminUser) throw new TRPCError({ code: "FORBIDDEN" });
+      await updateCapituloNumero(input.id, input.numero);
+      return { success: true };
     }),
 
   pending: protectedProcedure.query(({ ctx }) => {
