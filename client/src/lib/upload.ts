@@ -30,7 +30,7 @@ export async function uploadPaginas(
   onProgress?: (atual: number, total: number) => void
 ): Promise<UploadResult[]> {
   const results: UploadResult[] = [];
-  const BATCH = 5;
+  const BATCH = 20;
 
   for (let i = 0; i < files.length; i += BATCH) {
     const batch = files.slice(i, i + BATCH);
