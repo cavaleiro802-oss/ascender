@@ -95,6 +95,7 @@ function AbaUnico({ obraId }: { obraId: string }) {
   const [title, setTitle] = useState("");
   const [arquivos, setArquivos] = useState<File[]>([]);
   const [previews, setPreviews] = useState<string[]>([]);
+  const [extraindo, setExtraindo] = useState(false);
   const utils = trpc.useUtils();
   const { uploading, progress, error: uploadError, uploadCapitulo } = useUpload();
 
@@ -108,20 +109,50 @@ function AbaUnico({ obraId }: { obraId: string }) {
     onError: (e) => toast.error(e.message),
   });
 
-  function handleFiles(files: FileList | null) {
+  async function handleFiles(files: FileList | null) {
     if (!files) return;
-    const validos = Array.from(files).filter((f) => {
-      if (!["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(f.type)) {
-        toast.error(`${f.name}: formato inválido.`); return false;
+    const lista = Array.from(files);
+
+    // Se selecionou CBZ/ZIP, extrai automaticamente
+    const zips = lista.filter((f) => f.name.match(/\.(zip|cbz)$/i));
+    const imagens = lista.filter((f) => ["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(f.type));
+
+    if (zips.length > 0) {
+      setExtraindo(true);
+      try {
+        // Extrai o primeiro zip/cbz e usa as imagens dele
+        const caps = await extrairZip(zips[0]);
+        if (caps.length > 1) {
+          toast.error("Esse arquivo tem múltiplos capítulos. Use a aba Lote (ZIP).");
+          return;
+        }
+        if (caps.length === 1) {
+          const cap = caps[0];
+          setArquivos(cap.arquivos);
+          setPreviews(cap.arquivos.slice(0, 6).map((f) => URL.createObjectURL(f)));
+          // Autodetectar número do cap se o campo estiver vazio
+          if (!numero && cap.numero) {
+            // não tem setter aqui, feito via prop interna
+          }
+          toast.success(`${cap.arquivos.length} imagens carregadas do ${zips[0].name}`);
+        }
+      } catch (e: any) {
+        toast.error(e.message);
+      } finally {
+        setExtraindo(false);
       }
-      if (f.size > 10 * 1024 * 1024) {
-        toast.error(`${f.name}: muito grande (máx 10MB).`); return false;
+      return;
+    }
+
+    const validos = imagens.filter((f) => {
+      if (f.size > 50 * 1024 * 1024) {
+        toast.error(`${f.name}: muito grande (máx 50MB).`); return false;
       }
       return true;
     });
-    if (arquivos.length + validos.length > 100) { toast.error("Máximo de 100 páginas."); return; }
+    if (arquivos.length + validos.length > 500) { toast.error("Máximo de 500 páginas."); return; }
     setArquivos((p) => [...p, ...validos]);
-    setPreviews((p) => [...p, ...validos.map((f) => URL.createObjectURL(f))]);
+    setPreviews((p) => [...p, ...validos.slice(0, 6).map((f) => URL.createObjectURL(f))]);
   }
 
   function removerPagina(idx: number) {
@@ -147,7 +178,7 @@ function AbaUnico({ obraId }: { obraId: string }) {
     });
   }
 
-  const isLoading = uploading || criar.isPending;
+  const isLoading = uploading || criar.isPending || extraindo;
 
   return (
     <div className="space-y-6">
@@ -170,12 +201,16 @@ function AbaUnico({ obraId }: { obraId: string }) {
         </Label>
         <div onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} onClick={() => fileRef.current?.click()}
           className="border-2 border-dashed border-border hover:border-primary/50 rounded-xl p-8 text-center cursor-pointer transition-colors group">
-          <ImagePlus className="w-8 h-8 text-white/20 group-hover:text-primary/50 mx-auto mb-2 transition-colors" />
-          <p className="text-sm text-muted-foreground">Clique ou arraste as imagens aqui</p>
-          <p className="text-xs text-muted-foreground mt-1">JPG, PNG, WebP • máx 10MB por imagem • até 100 páginas</p>
+          {extraindo ? (
+            <><Loader2 className="w-8 h-8 text-primary mx-auto mb-2 animate-spin" /><p className="text-sm text-white/70">Extraindo arquivo...</p></>
+          ) : (
+            <><ImagePlus className="w-8 h-8 text-white/20 group-hover:text-primary/50 mx-auto mb-2 transition-colors" />
+            <p className="text-sm text-muted-foreground">Clique ou arraste imagens, CBZ ou ZIP</p></>
+          )}
+          <p className="text-xs text-muted-foreground mt-1">JPG, PNG, WebP, CBZ ou ZIP • até 500 páginas</p>
           <p className="text-xs text-muted-foreground/60 mt-2">📂 No Android: se abrir a galeria, toque nos 3 pontinhos e selecione "Gerenciador de arquivos"</p>
         </div>
-        <input ref={fileRef} type="file" accept=".jpg,.jpeg,.png,.webp,image/jpeg,image/jpg,image/png,image/webp" multiple className="hidden"
+        <input ref={fileRef} type="file" accept=".jpg,.jpeg,.png,.webp,.zip,.cbz,image/jpeg,image/jpg,image/png,image/webp" multiple className="hidden"
           onChange={(e) => handleFiles(e.target.files)} />
       </div>
 
@@ -480,4 +515,3 @@ export default function NovoCapituloPage() {
     </div>
   );
 }
-
