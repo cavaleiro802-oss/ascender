@@ -102,6 +102,8 @@ export default function ObraPage() {
   const [comment, setComment] = useState("");
   const [replyTo, setReplyTo] = useState<{ id: number; nome: string } | null>(null);
   const [editando, setEditando] = useState(false);
+  const [editandoNumCap, setEditandoNumCap] = useState<number | null>(null); // id do cap sendo editado
+  const [novoNumero, setNovoNumero] = useState("");
   const [editTitle, setEditTitle] = useState("");
   const [editSynopsis, setEditSynopsis] = useState("");
   const [editAndamento, setEditAndamento] = useState<keyof typeof ANDAMENTO_CONFIG>("em_andamento");
@@ -140,6 +142,16 @@ export default function ObraPage() {
   });
 
   useEffect(() => { if (obraId) incrementViews.mutate({ id: obraId }); }, [obraId]);
+
+  const updateNumCap = trpc.capitulos.updateNumero.useMutation({
+    onSuccess: () => {
+      utils.capitulos.list.invalidate({ obraId });
+      setEditandoNumCap(null);
+      setNovoNumero("");
+      toast.success("Número atualizado!");
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const isOwnerOrAdmin = isTranslator && (obra?.authorId === user?.id || isAdmin);
   const genres = parseGenres(obra?.genres);
@@ -456,9 +468,28 @@ export default function ObraPage() {
                   <div key={cap.id}
                     className="flex items-center justify-between px-3 py-3 rounded-lg hover:bg-white/5 cursor-pointer transition-colors group border border-transparent hover:border-border/50"
                     onClick={() => navigate(`/obra/${obraId}/capitulo/${cap.id}`)}>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs text-muted-foreground w-8 text-right font-mono">{cap.numero}</span>
-                      <div>
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      {editandoNumCap === cap.id ? (
+                        <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                          <input
+                            type="number" step="0.1" autoFocus
+                            value={novoNumero}
+                            onChange={(e) => setNovoNumero(e.target.value)}
+                            className="w-16 text-xs bg-secondary border border-primary rounded px-1.5 py-0.5 text-white text-center"
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && novoNumero) updateNumCap.mutate({ id: cap.id, numero: parseFloat(novoNumero) });
+                              if (e.key === "Escape") { setEditandoNumCap(null); setNovoNumero(""); }
+                            }}
+                          />
+                          <button onClick={() => novoNumero && updateNumCap.mutate({ id: cap.id, numero: parseFloat(novoNumero) })}
+                            className="text-[10px] text-green-400 hover:text-green-300 font-bold">✓</button>
+                          <button onClick={() => { setEditandoNumCap(null); setNovoNumero(""); }}
+                            className="text-[10px] text-red-400 hover:text-red-300 font-bold">✕</button>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground w-8 text-right font-mono">{cap.numero}</span>
+                      )}
+                      <div className="flex-1 min-w-0">
                         <span className="text-sm text-white/80 group-hover:text-white transition-colors">
                           {cap.title || `Capítulo ${cap.numero}`}
                         </span>
@@ -469,6 +500,14 @@ export default function ObraPage() {
                     </div>
                     <div className="flex items-center gap-2 text-xs text-muted-foreground">
                       <Eye className="w-3 h-3" />{kk((cap as any).viewsTotal ?? 0)}
+                      {isOwnerOrAdmin && editandoNumCap !== cap.id && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setEditandoNumCap(cap.id); setNovoNumero(String(cap.numero)); }}
+                          className="opacity-0 group-hover:opacity-100 text-white/40 hover:text-primary transition-all ml-1"
+                          title="Editar número">
+                          ✏️
+                        </button>
+                      )}
                       <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100" />
                     </div>
                   </div>
