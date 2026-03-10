@@ -344,7 +344,7 @@ function AbaLote({ obraId }: { obraId: string }) {
     setProgresso({ atual: 0, total: caps.length });
     let sucessos = 0;
     let concluidos = 0;
-    const PARALELO = 3; // 3 caps simultâneos
+    const PARALELO = 10; // 10 caps simultâneos
 
     async function enviarCap(cap: CapLote, i: number) {
       setCaps((prev) => prev.map((c, idx) => idx === i ? { ...c, status: "enviando" } : c));
