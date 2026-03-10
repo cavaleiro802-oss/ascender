@@ -1,6 +1,7 @@
 import { Router } from "express";
 import multer from "multer";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { v4 as uuid } from "uuid";
 import sharp from "sharp";
 import { checkRateLimit, LIMITS } from "./rateLimit";
@@ -24,6 +25,7 @@ const r2 = new S3Client({
 const BUCKET = process.env.R2_BUCKET ?? "ascender-imagens";
 const PUBLIC_URL = process.env.R2_PUBLIC_URL!;
 
+// ─── Multer (só usado para capa/avatar que passam pelo servidor) ──────────────
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_SIZE },
@@ -41,43 +43,19 @@ async function getUser(req: any) {
   return getUserByOpenId(sessao.openId);
 }
 
-async function comprimirImagem(buffer: Buffer, mimetype: string, pasta: string): Promise<{ buffer: Buffer; mimetype: string }> {
-  // Só comprime páginas de capítulo — capas e avatares mantém qualidade maior
-  if (pasta === "paginas") {
-    const comprimido = await sharp(buffer)
-      .jpeg({ quality: 75, progressive: true })
-      .toBuffer();
-    return { buffer: comprimido, mimetype: "image/jpeg" };
-  }
-  if (pasta === "capas") {
-    const comprimido = await sharp(buffer)
-      .jpeg({ quality: 85, progressive: true })
-      .toBuffer();
-    return { buffer: comprimido, mimetype: "image/jpeg" };
-  }
-  return { buffer, mimetype };
-}
-
 async function enviarParaR2(buffer: Buffer, mimetype: string, pasta: string) {
-  // Comprimir antes de enviar
-  const { buffer: bufferFinal, mimetype: mimetypeFinal } = await comprimirImagem(buffer, mimetype, pasta);
-
-  const ext = mimetypeFinal.split("/")[1].replace("jpeg", "jpg");
+  const ext = mimetype.split("/")[1].replace("jpeg", "jpg");
   const key = `${pasta}/${uuid()}.${ext}`;
-
   await r2.send(new PutObjectCommand({
     Bucket: BUCKET,
     Key: key,
-    Body: bufferFinal,
-    ContentType: mimetypeFinal,
+    Body: buffer,
+    ContentType: mimetype,
   }));
-
-  return {
-    key,
-    publicUrl: `${PUBLIC_URL}/${key}`,
-  };
+  return { key, publicUrl: `${PUBLIC_URL}/${key}` };
 }
 
+// ─── POST /api/upload/capa ────────────────────────────────────────────────────
 uploadRouter.post("/capa", upload.single("file"), async (req, res) => {
   try {
     const user = await getUser(req);
@@ -90,7 +68,12 @@ uploadRouter.post("/capa", upload.single("file"), async (req, res) => {
 
     if (!req.file) return res.status(400).json({ error: "Arquivo obrigatório." });
 
-    const result = await enviarParaR2(req.file.buffer, req.file.mimetype, "capas");
+    // Compressão da capa via sharp
+    const buffer = await sharp(req.file.buffer)
+      .jpeg({ quality: 85 })
+      .toBuffer();
+
+    const result = await enviarParaR2(buffer, "image/jpeg", "capas");
     res.json(result);
   } catch (e: any) {
     console.error("[Upload capa] erro:", e.message);
@@ -98,30 +81,7 @@ uploadRouter.post("/capa", upload.single("file"), async (req, res) => {
   }
 });
 
-uploadRouter.post("/paginas", upload.array("files", 500), async (req, res) => {
-  try {
-    const user = await getUser(req);
-    if (!user) return res.status(401).json({ error: "Faça login primeiro." });
-    if (user.banned || user.bannedTotal) return res.status(403).json({ error: "Conta suspensa." });
-    if (!ROLES_TRADUTOR.includes(user.role)) return res.status(403).json({ error: "Somente tradutores podem enviar páginas." });
-
-    const rl = checkRateLimit({ key: `upload:${user.id}`, ...LIMITS.upload });
-    if (!rl.allowed) return res.status(429).json({ error: `Muitos uploads. Tente em ${rl.retryAfterSec}s.` });
-
-    const files = req.files as Express.Multer.File[];
-    if (!files || files.length === 0) return res.status(400).json({ error: "Nenhum arquivo enviado." });
-
-    const urls = await Promise.all(
-      files.map((f) => enviarParaR2(f.buffer, f.mimetype, "paginas"))
-    );
-
-    res.json({ urls });
-  } catch (e: any) {
-    console.error("[Upload paginas] erro:", e.message);
-    res.status(400).json({ error: e.message });
-  }
-});
-
+// ─── POST /api/upload/avatar ──────────────────────────────────────────────────
 uploadRouter.post("/avatar", upload.single("file"), async (req, res) => {
   try {
     const user = await getUser(req);
@@ -138,6 +98,64 @@ uploadRouter.post("/avatar", upload.single("file"), async (req, res) => {
   } catch (e: any) {
     console.error("[Upload avatar] erro:", e.message);
     res.status(400).json({ error: e.message });
+  }
+});
+
+// ─── POST /api/upload/presign ─────────────────────────────────────────────────
+// Gera URLs pré-assinadas para upload DIRETO do browser → R2
+// Body: { arquivos: Array<{ tipo: string; tamanho: number }> }
+// Retorna: { urls: Array<{ uploadUrl: string; publicUrl: string; key: string }> }
+uploadRouter.post("/presign", async (req, res) => {
+  try {
+    const user = await getUser(req);
+    if (!user) return res.status(401).json({ error: "Faça login primeiro." });
+    if (user.banned || user.bannedTotal) return res.status(403).json({ error: "Conta suspensa." });
+    if (!ROLES_TRADUTOR.includes(user.role)) return res.status(403).json({ error: "Somente tradutores podem enviar páginas." });
+
+    const rl = checkRateLimit({ key: `upload:${user.id}`, ...LIMITS.upload });
+    if (!rl.allowed) return res.status(429).json({ error: `Muitos uploads. Tente em ${rl.retryAfterSec}s.` });
+
+    const { arquivos } = req.body as {
+      arquivos: Array<{ tipo: string; tamanho: number }>;
+    };
+
+    if (!Array.isArray(arquivos) || arquivos.length === 0) {
+      return res.status(400).json({ error: "Lista de arquivos obrigatória." });
+    }
+    if (arquivos.length > 500) {
+      return res.status(400).json({ error: "Máximo de 500 imagens por vez." });
+    }
+
+    // Valida cada arquivo antes de gerar URLs
+    for (const a of arquivos) {
+      if (!ALLOWED_TYPES.includes(a.tipo)) {
+        return res.status(400).json({ error: `Tipo não permitido: ${a.tipo}. Use JPG, PNG ou WebP.` });
+      }
+      if (a.tamanho > MAX_SIZE) {
+        return res.status(400).json({ error: `Arquivo muito grande (máx 50MB por imagem).` });
+      }
+    }
+
+    // Gera uma presigned URL por imagem (PUT direto no R2, expira em 10 min)
+    const urls = await Promise.all(
+      arquivos.map(async (a) => {
+        const ext = a.tipo.split("/")[1].replace("jpeg", "jpg");
+        const key = `paginas/${uuid()}.${ext}`;
+        const command = new PutObjectCommand({
+          Bucket: BUCKET,
+          Key: key,
+          ContentType: a.tipo,
+          ContentLength: a.tamanho,
+        });
+        const uploadUrl = await getSignedUrl(r2, command, { expiresIn: 600 });
+        return { uploadUrl, publicUrl: `${PUBLIC_URL}/${key}`, key };
+      })
+    );
+
+    res.json({ urls });
+  } catch (e: any) {
+    console.error("[Presign] erro:", e.message);
+    res.status(500).json({ error: e.message });
   }
 });
 
