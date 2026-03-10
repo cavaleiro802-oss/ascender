@@ -126,7 +126,8 @@ async function extrairZip(file: File): Promise<CapLote[]> {
       arquivos.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
       const match = pasta.match(/(\d+(?:\.\d+)?)/);
       const numero = match ? match[1] : "";
-      const previews = arquivos.map((f) => URL.createObjectURL(f));
+      // Só gera preview da primeira imagem (evita OOM no Android com muitos caps)
+      const previews = arquivos.slice(0, 1).map((f) => URL.createObjectURL(f));
       return { pasta, numero, arquivos, previews, status: "pendente" as const };
     });
 
@@ -149,7 +150,7 @@ async function extrairZip(file: File): Promise<CapLote[]> {
             : ext === "png" ? "image/png" : "image/webp";
           return new File([new Blob([data], { type: mime })], path, { type: mime });
         });
-      const previews = arquivos.map((f) => URL.createObjectURL(f));
+      const previews = arquivos.slice(0, 1).map((f) => URL.createObjectURL(f));
       const match = file.name.match(/(\d+(?:\.\d+)?)/);
       return [{ pasta: file.name, numero: match ? match[1] : "", arquivos, previews, status: "pendente" as const }];
     }
@@ -437,10 +438,25 @@ function AbaLote({ obraId }: { obraId: string }) {
                 )}
               </div>
 
-              {/* Preview da primeira imagem */}
-              {cap.previews[0] && (
-                <img src={cap.previews[0]} alt="" className="w-8 h-10 object-cover rounded flex-shrink-0" />
-              )}
+              {/* Preview da primeira imagem — onError mostra placeholder */}
+              <div className="w-8 h-10 rounded flex-shrink-0 bg-secondary overflow-hidden">
+                {cap.previews[0] ? (
+                  <img
+                    src={cap.previews[0]}
+                    alt=""
+                    className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.target as HTMLImageElement).style.display = "none";
+                      (e.target as HTMLImageElement).parentElement!.classList.add("flex","items-center","justify-center");
+                      (e.target as HTMLImageElement).insertAdjacentHTML("afterend", '<span class="text-[9px] text-white/30">IMG</span>');
+                    }}
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center">
+                    <span className="text-[9px] text-white/30">IMG</span>
+                  </div>
+                )}
+              </div>
 
               {/* Info */}
               <div className="flex-1 min-w-0">
@@ -539,3 +555,4 @@ export default function NovoCapituloPage() {
     </div>
   );
 }
+
