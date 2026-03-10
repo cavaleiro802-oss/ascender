@@ -2,6 +2,7 @@ import { Router } from "express";
 import multer from "multer";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { v4 as uuid } from "uuid";
+import sharp from "sharp";
 import { checkRateLimit, LIMITS } from "./rateLimit";
 import { getSessao, getUserByOpenId } from "./db";
 
@@ -40,19 +41,35 @@ async function getUser(req: any) {
   return getUserByOpenId(sessao.openId);
 }
 
-async function enviarParaR2(buffer: Buffer, mimetype: string, pasta: string) {
-  console.log("[R2] endpoint:", process.env.R2_ENDPOINT);
-  console.log("[R2] bucket:", BUCKET);
-  console.log("[R2] accessKeyId:", process.env.R2_ACCESS_KEY_ID?.slice(0, 8) + "...");
+async function comprimirImagem(buffer: Buffer, mimetype: string, pasta: string): Promise<{ buffer: Buffer; mimetype: string }> {
+  // Só comprime páginas de capítulo — capas e avatares mantém qualidade maior
+  if (pasta === "paginas") {
+    const comprimido = await sharp(buffer)
+      .jpeg({ quality: 75, progressive: true })
+      .toBuffer();
+    return { buffer: comprimido, mimetype: "image/jpeg" };
+  }
+  if (pasta === "capas") {
+    const comprimido = await sharp(buffer)
+      .jpeg({ quality: 85, progressive: true })
+      .toBuffer();
+    return { buffer: comprimido, mimetype: "image/jpeg" };
+  }
+  return { buffer, mimetype };
+}
 
-  const ext = mimetype.split("/")[1].replace("jpeg", "jpg");
+async function enviarParaR2(buffer: Buffer, mimetype: string, pasta: string) {
+  // Comprimir antes de enviar
+  const { buffer: bufferFinal, mimetype: mimetypeFinal } = await comprimirImagem(buffer, mimetype, pasta);
+
+  const ext = mimetypeFinal.split("/")[1].replace("jpeg", "jpg");
   const key = `${pasta}/${uuid()}.${ext}`;
 
   await r2.send(new PutObjectCommand({
     Bucket: BUCKET,
     Key: key,
-    Body: buffer,
-    ContentType: mimetype,
+    Body: bufferFinal,
+    ContentType: mimetypeFinal,
   }));
 
   return {
