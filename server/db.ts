@@ -309,6 +309,17 @@ export async function updateCapituloNumero(id: number, numero: number) {
 
 export async function deleteCapitulo(id: number) {
   const db = await getDb(); if (!db) return;
+  // Buscar keys das imagens antes de deletar
+  const cap = await db.select().from(capitulos).where(eq(capitulos.id, id)).limit(1);
+  if (cap[0]) {
+    try {
+      const keys: string[] = JSON.parse(cap[0].paginasKeys ?? "[]");
+      const { deletarArquivo } = await import("./r2");
+      await Promise.all(keys.map((k) => deletarArquivo(k)));
+    } catch (e) {
+      console.error("[deleteCapitulo] erro ao deletar R2:", e);
+    }
+  }
   await db.delete(capitulos).where(eq(capitulos.id, id));
 }
 
