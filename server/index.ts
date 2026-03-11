@@ -58,8 +58,17 @@ directives: {
 
 defaultSrc: ["'self'"],
 
-connectSrc: ["'self'", SITE_URL, "https://accounts.google.com", "https://oauth2.googleapis.com", 
-             "https://*.r2.cloudflarestorage.com" ].filter(Boolean),
+connectSrc: [
+  "'self'",
+  SITE_URL,
+  "https://accounts.google.com",
+  "https://oauth2.googleapis.com",
+  // R2: domínio público (r2.dev) E endpoint de storage (para presigned URLs PUT direto)
+  "https://*.r2.dev",
+  "https://*.r2.cloudflarestorage.com",
+  process.env.R2_PUBLIC_URL ?? "",
+  process.env.R2_ENDPOINT ?? "",
+].filter(Boolean),
 imgSrc: [
   "'self'",
   "data:",
