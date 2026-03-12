@@ -38,60 +38,85 @@ export async function uploadAvatar(file: File): Promise<UploadResult> {
 }
 
 // ─── Upload de páginas via presigned URL (browser → R2 direto) ───────────────
-// Mais rápido, sem timeout, sem limite de RAM no servidor
-const PARALELO = 8; // uploads simultâneos por cap
+const PARALELO = 3; // conservador — evita throttle do R2
+const TIMEOUT_MS = 60_000; // 60s por imagem antes de desistir
+
+// fetch com timeout
+async function fetchComTimeout(url: string, opts: RequestInit, ms: number): Promise<Response> {
+  const ctrl = new AbortController();
+  const timer = setTimeout(() => ctrl.abort(), ms);
+  try {
+    return await fetch(url, { ...opts, signal: ctrl.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export async function uploadPaginas(
   files: File[],
   onProgress?: (atual: number, total: number) => void
 ): Promise<UploadResult[]> {
-  // 1. Pedir as presigned URLs pro servidor (uma chamada só)
-  const res = await fetch("/api/upload/presign", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      arquivos: files.map((f) => ({ tipo: f.type || "image/jpeg", tamanho: f.size })),
-    }),
-  });
-
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err.error || "Erro ao obter URLs de upload.");
+  // 1. Pedir presigned URLs — com tratamento de erro legível
+  let presignRes: Response;
+  try {
+    presignRes = await fetchComTimeout("/api/upload/presign", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        arquivos: files.map((f) => ({ tipo: f.type || "image/jpeg", tamanho: f.size })),
+      }),
+    }, 30_000);
+  } catch (e: any) {
+    if (e.name === "AbortError") throw new Error("Tempo esgotado ao conectar com o servidor.");
+    throw new Error("Sem conexão com o servidor. Verifique sua internet.");
   }
 
-  const { urls } = await res.json() as {
+  if (!presignRes.ok) {
+    let msg = `Erro do servidor (${presignRes.status})`;
+    try {
+      const err = await presignRes.json();
+      msg = err.error || msg;
+    } catch {}
+    throw new Error(msg);
+  }
+
+  const { urls } = await presignRes.json() as {
     urls: Array<{ uploadUrl: string; publicUrl: string; key: string }>;
   };
 
-  // 2. Fazer upload direto do browser → R2 em paralelo (PARALELO por vez)
+  // 2. Upload direto → R2 com retry automático (até 3 tentativas por imagem)
   const results: UploadResult[] = new Array(files.length);
   let concluidos = 0;
+
+  async function enviarUm(file: File, uploadUrl: string, publicUrl: string, key: string, idx: number) {
+    let lastErr = "";
+    for (let tentativa = 1; tentativa <= 3; tentativa++) {
+      try {
+        const r = await fetchComTimeout(uploadUrl, {
+          method: "PUT",
+          headers: { "Content-Type": file.type || "image/jpeg" },
+          body: file,
+        }, TIMEOUT_MS);
+        if (r.ok) {
+          results[idx] = { publicUrl, key };
+          concluidos++;
+          onProgress?.(concluidos, files.length);
+          return;
+        }
+        lastErr = `HTTP ${r.status}`;
+      } catch (e: any) {
+        lastErr = e.name === "AbortError" ? "timeout" : e.message;
+        if (tentativa < 3) await new Promise(r => setTimeout(r, 1000 * tentativa));
+      }
+    }
+    throw new Error(`Imagem ${idx + 1} falhou após 3 tentativas (${lastErr}).`);
+  }
 
   for (let i = 0; i < files.length; i += PARALELO) {
     const lote = files.slice(i, i + PARALELO);
     const lotUrls = urls.slice(i, i + PARALELO);
-
-    await Promise.all(
-      lote.map(async (file, j) => {
-        const { uploadUrl, publicUrl, key } = lotUrls[j];
-        const idx = i + j;
-
-        const uploadRes = await fetch(uploadUrl, {
-          method: "PUT",
-          headers: { "Content-Type": file.type || "image/jpeg" },
-          body: file,
-        });
-
-        if (!uploadRes.ok) {
-          throw new Error(`Falha ao enviar imagem ${idx + 1} (HTTP ${uploadRes.status}).`);
-        }
-
-        results[idx] = { publicUrl, key };
-        concluidos++;
-        onProgress?.(concluidos, files.length);
-      })
-    );
+    await Promise.all(lote.map((file, j) => enviarUm(file, lotUrls[j].uploadUrl, lotUrls[j].publicUrl, lotUrls[j].key, i + j)));
   }
 
   return results;
