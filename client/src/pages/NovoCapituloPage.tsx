@@ -270,20 +270,40 @@ function AbaLote({ obraId }: { obraId: string }) {
   const utils = trpc.useUtils();
 
   const criar = trpc.capitulos.create.useMutation({ onError: (e) => toast.error(e.message) });
-  const { uploadCapitulo } = useUpload();
+  const { uploadCapitulo, error: uploadError } = useUpload();
 
   async function handleZips(files: FileList) {
     setExtraindo(true);
     setCaps([]);
     const todos: CapLote[] = [];
-    for (let i = 0; i < files.length; i++) {
+
+    // Separar zips/cbz de imagens soltas
+    const zips = Array.from(files).filter(f => f.name.match(/\.(zip|cbz)$/i));
+    const imgs = Array.from(files).filter(f => f.type.startsWith("image/"));
+
+    // Processar zips/cbz normalmente
+    for (const zip of zips) {
       try {
-        const resultado = await extrairZip(files[i]);
+        const resultado = await extrairZip(zip);
         todos.push(...resultado);
       } catch (e: any) {
-        toast.error(`${files[i].name}: ${e.message}`);
+        toast.error(`${zip.name}: ${e.message}`);
       }
     }
+
+    // Imagens soltas viram um único capítulo
+    if (imgs.length > 0) {
+      imgs.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
+      const previews = imgs.slice(0, 4).map(f => URL.createObjectURL(f));
+      todos.push({
+        pasta: "Imagens soltas",
+        numero: "",
+        arquivos: imgs,
+        previews,
+        status: "pendente",
+      });
+    }
+
     todos.sort((a, b) => parseFloat(a.numero || "0") - parseFloat(b.numero || "0"));
     setCaps(todos);
     if (todos.length > 0) toast.success(`${todos.length} capítulo${todos.length !== 1 ? "s" : ""} detectado${todos.length !== 1 ? "s" : ""}!`);
@@ -305,13 +325,13 @@ function AbaLote({ obraId }: { obraId: string }) {
     setProgresso({ atual: 0, total: caps.length });
     let sucessos = 0;
     let concluidos = 0;
-    const PARALELO = 10; // 10 caps simultâneos
+    const PARALELO = 3; // 3 caps simultâneos — evita sobrecarga
 
     async function enviarCap(cap: CapLote, i: number) {
       setCaps((prev) => prev.map((c, idx) => idx === i ? { ...c, status: "enviando" } : c));
       try {
         const resultados = await uploadCapitulo(cap.arquivos);
-        if (!resultados) throw new Error("Falha no upload das imagens.");
+        if (!resultados) throw new Error(uploadError || "Falha no upload das imagens.");
         await criar.mutateAsync({
           obraId: parseInt(obraId),
           numero: parseFloat(cap.numero),
@@ -370,11 +390,11 @@ function AbaLote({ obraId }: { obraId: string }) {
               <p className="text-sm text-white/70">Extraindo ZIP...</p></>
           ) : (
             <><Package className="w-8 h-8 text-white/20 group-hover:text-primary/50 mx-auto mb-2 transition-colors" />
-              <p className="text-sm text-muted-foreground">Clique para selecionar ZIP ou CBZ</p>
-              <p className="text-xs text-muted-foreground mt-1">Vários arquivos de uma vez • ZIP ou CBZ • Máx. 500MB cada</p></>
+              <p className="text-sm text-muted-foreground">Clique para selecionar arquivos</p>
+              <p className="text-xs text-muted-foreground mt-1">ZIP, CBZ ou imagens soltas • Vários de uma vez • Máx. 500MB cada</p></>
           )}
         </div>
-        <input ref={zipRef} type="file" accept=".zip,.cbz" multiple className="hidden"
+        <input ref={zipRef} type="file" accept=".zip,.cbz,.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple className="hidden"
           onChange={(e) => { const files = e.target.files; if (files && files.length > 0) handleZips(files); }} />
       </div>
 
@@ -515,3 +535,4 @@ export default function NovoCapituloPage() {
     </div>
   );
 }
+
