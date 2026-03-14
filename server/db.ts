@@ -192,7 +192,7 @@ export async function getObraById(id: number) {
   const result = await db.select().from(obras).where(eq(obras.id, id)).limit(1);
   return result[0];
 }
-export async function createObra(data: { title: string; synopsis?: string; genres?: string[]; coverUrl?: string; authorId: number; originalAuthor?: string; status: "em_espera" | "aprovada"; andamento?: "em_andamento" | "iato" | "finalizado"; }) {
+export async function createObra(data: { title: string; synopsis?: string; genres?: string[]; coverUrl?: string; coverKey?: string; authorId: number; originalAuthor?: string; tipo?: "manga" | "novel"; status: "em_espera" | "aprovada"; andamento?: "em_andamento" | "iato" | "finalizado"; }) {
   const db = await getDb(); if (!db) throw new Error("DB unavailable");
   const result = await db.insert(obras).values({ ...data, genres: data.genres ? JSON.stringify(data.genres) : null }).returning();
   return result[0];
@@ -293,7 +293,7 @@ export async function getCapituloById(id: number) {
   const result = await db.select().from(capitulos).where(eq(capitulos.id, id)).limit(1);
   return result[0];
 }
-export async function createCapitulo(data: { obraId: number; authorId: number; numero: number; title?: string; paginas?: string; paginasKeys?: string; status: "aguardando" | "aprovado"; }) {
+export async function createCapitulo(data: { obraId: number; authorId: number; numero: number; title?: string; paginas?: string; paginasKeys?: string; conteudo?: string; status: "aguardando" | "aprovado"; }) {
   const db = await getDb(); if (!db) throw new Error("DB unavailable");
   const result = await db.insert(capitulos).values(data).returning();
   // Atualizar updatedAt da obra para aparecer no topo da home
