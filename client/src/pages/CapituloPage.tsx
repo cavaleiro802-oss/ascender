@@ -30,6 +30,7 @@ export default function CapituloPage() {
   }, [capId]);
 
   const paginas: string[] = capitulo?.paginas ? JSON.parse(capitulo.paginas) : [];
+  const isNovel = !!(capitulo as any)?.conteudo && paginas.length === 0;
 
   // Incluir aprovado + aguardando (para tradutor_oficial e admins verem seus caps)
   const capsVisiveis = (todosCapitulos as any[])
@@ -95,19 +96,34 @@ export default function CapituloPage() {
             Cap. {capitulo.numero}{capitulo.title ? ` — ${capitulo.title}` : ""}
           </p>
           <div className="flex items-center gap-0.5 bg-white/10 rounded-lg p-1">
-            {(["scroll", "click"] as Modo[]).map((m) => (
+            {!isNovel && (["scroll", "click"] as Modo[]).map((m) => (
               <button key={m} onClick={() => trocarModo(m)}
                 className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors ${modo === m ? "bg-primary text-white" : "text-white/50 hover:text-white"}`}>
                 {m === "scroll" ? <AlignJustify className="w-3 h-3" /> : <MousePointer className="w-3 h-3" />}
                 {m === "scroll" ? "Scroll" : "Click"}
               </button>
             ))}
+            {isNovel && (
+              <span className="px-2.5 py-1 text-xs font-medium text-white/40">📖 Novel</span>
+            )}
           </div>
         </div>
       </header>
 
       <div className="pt-12">
-        {paginas.length === 0 ? (
+        {isNovel ? (
+          <div className="max-w-2xl mx-auto px-5 py-8 pb-24">
+            <div className="prose prose-invert prose-lg max-w-none">
+              {((capitulo as any).conteudo as string).split("\n").map((paragrafo, i) =>
+                paragrafo.trim() === "" ? (
+                  <div key={i} className="h-4" />
+                ) : (
+                  <p key={i} className="text-white/85 leading-relaxed text-base mb-0">{paragrafo}</p>
+                )
+              )}
+            </div>
+          </div>
+        ) : paginas.length === 0 ? (
           <div className="flex items-center justify-center min-h-[60vh] text-white/30 text-sm">
             Nenhuma página disponível.
           </div>
