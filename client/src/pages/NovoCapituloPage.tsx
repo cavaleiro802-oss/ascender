@@ -487,11 +487,90 @@ function AbaLote({ obraId }: { obraId: string }) {
   );
 }
 
+// ─── Aba Novel (texto) ────────────────────────────────────────────────────────
+function AbaNovel({ obraId }: { obraId: string }) {
+  const [, navigate] = useLocation();
+  const [numero, setNumero] = useState("");
+  const [title, setTitle] = useState("");
+  const [conteudo, setConteudo] = useState("");
+  const utils = trpc.useUtils();
+
+  const criar = trpc.capitulos.create.useMutation({
+    onSuccess: () => {
+      toast.success("Capítulo enviado!");
+      utils.capitulos.list.invalidate({ obraId: parseInt(obraId) });
+      navigate(`/obra/${obraId}`);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  async function handleSubmit() {
+    if (!numero || isNaN(parseFloat(numero))) return toast.error("Número do capítulo obrigatório.");
+    if (conteudo.trim().length < 10) return toast.error("O conteúdo do capítulo está muito curto.");
+    await criar.mutateAsync({
+      obraId: parseInt(obraId),
+      numero: parseFloat(numero),
+      title: title.trim() || undefined,
+      conteudo: conteudo.trim(),
+    });
+  }
+
+  const palavras = conteudo.trim() ? conteudo.trim().split(/\s+/).length : 0;
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label className="text-white/80 mb-1.5 block">Número *</Label>
+          <Input type="number" step="0.1" value={numero} onChange={(e) => setNumero(e.target.value)}
+            placeholder="Ex: 42 ou 1.5" className="bg-secondary border-border text-white placeholder:text-muted-foreground" />
+        </div>
+        <div>
+          <Label className="text-white/80 mb-1.5 block">Título <span className="text-muted-foreground font-normal">(opcional)</span></Label>
+          <Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={255}
+            placeholder="Ex: O Confronto Final" className="bg-secondary border-border text-white placeholder:text-muted-foreground" />
+        </div>
+      </div>
+
+      <div>
+        <div className="flex items-center justify-between mb-1.5">
+          <Label className="text-white/80">Conteúdo *</Label>
+          <span className="text-xs text-muted-foreground">{palavras} palavras · {conteudo.length}/500000 chars</span>
+        </div>
+        <textarea
+          value={conteudo}
+          onChange={(e) => setConteudo(e.target.value)}
+          maxLength={500000}
+          rows={20}
+          placeholder="Cole ou escreva o texto do capítulo aqui...
+
+Cada linha em branco vira uma quebra de parágrafo na leitura."
+          className="w-full px-4 py-3 bg-secondary border border-border rounded-xl text-white placeholder:text-muted-foreground text-sm leading-relaxed resize-y focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary font-mono"
+        />
+        <p className="text-xs text-muted-foreground mt-1">
+          💡 Cole direto do Google Docs, Word ou qualquer editor. Quebras de parágrafo são preservadas.
+        </p>
+      </div>
+
+      <Button onClick={handleSubmit} disabled={criar.isPending}
+        className="w-full bg-primary hover:bg-primary/90 text-white h-11 text-base font-bold">
+        {criar.isPending ? (
+          <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Salvando...</>
+        ) : `Enviar capítulo (${palavras} palavras)`}
+      </Button>
+    </div>
+  );
+}
+
 // ─── Página principal ──────────────────────────────────────────────────────────
 export default function NovoCapituloPage() {
   const { id: obraId } = useParams<{ id: string }>();
   const { user, isAuthenticated } = useAuth();
   const [aba, setAba] = useState<"unico" | "lote">("unico");
+
+  const { data: obra, isLoading: obraLoading } = trpc.obras.byId.useQuery(
+    { id: parseInt(obraId) }, { enabled: !!obraId }
+  );
 
   if (!isAuthenticated || !user || user.role === "usuario") {
     return (
@@ -504,33 +583,54 @@ export default function NovoCapituloPage() {
     );
   }
 
+  if (obraLoading) {
+    return (
+      <div className="min-h-screen">
+        <Topbar />
+        <div className="container py-20 text-center text-muted-foreground">Carregando...</div>
+      </div>
+    );
+  }
+
+  const isNovel = (obra as any)?.tipo === "novel";
+
   return (
     <div className="min-h-screen">
       <Topbar />
       <main className="container py-8 max-w-2xl">
-        <h1 className="text-2xl font-black text-white mb-6">📄 Novo Capítulo</h1>
+        <h1 className="text-2xl font-black text-white mb-1">
+          {isNovel ? "📖" : "📄"} Novo Capítulo
+        </h1>
+        {obra && (
+          <p className="text-sm text-muted-foreground mb-6">{(obra as any).title}</p>
+        )}
 
-        {/* Seletor de aba */}
-        <div className="flex gap-2 mb-6 bg-secondary p-1 rounded-xl">
-          <button
-            onClick={() => setAba("unico")}
-            className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${
-              aba === "unico" ? "bg-primary text-white shadow" : "text-white/50 hover:text-white"
-            }`}
-          >
-            📄 Cap único
-          </button>
-          <button
-            onClick={() => setAba("lote")}
-            className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${
-              aba === "lote" ? "bg-primary text-white shadow" : "text-white/50 hover:text-white"
-            }`}
-          >
-            📦 Lote (ZIP)
-          </button>
-        </div>
-
-        {aba === "unico" ? <AbaUnico obraId={obraId} /> : <AbaLote obraId={obraId} />}
+        {isNovel ? (
+          <AbaNovel obraId={obraId} />
+        ) : (
+          <>
+            {/* Seletor de aba — só para manga */}
+            <div className="flex gap-2 mb-6 bg-secondary p-1 rounded-xl">
+              <button
+                onClick={() => setAba("unico")}
+                className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${
+                  aba === "unico" ? "bg-primary text-white shadow" : "text-white/50 hover:text-white"
+                }`}
+              >
+                📄 Cap único
+              </button>
+              <button
+                onClick={() => setAba("lote")}
+                className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${
+                  aba === "lote" ? "bg-primary text-white shadow" : "text-white/50 hover:text-white"
+                }`}
+              >
+                📦 Lote (ZIP)
+              </button>
+            </div>
+            {aba === "unico" ? <AbaUnico obraId={obraId} /> : <AbaLote obraId={obraId} />}
+          </>
+        )}
       </main>
     </div>
   );
