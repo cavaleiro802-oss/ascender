@@ -57,6 +57,7 @@ export const obras = pgTable("obras", {
   coverKey:       varchar("coverKey",       { length: 500 }),
   authorId:       integer("authorId").notNull(),
   originalAuthor: varchar("originalAuthor", { length: 255 }),
+  tipo:           obraTipoEnum("tipo").default("manga").notNull(),
   status:         obraStatusEnum("status").default("em_espera").notNull(),
   andamento:      obraAndamentoEnum("andamento").default("em_andamento").notNull(),
   locked:         boolean("locked").default(false).notNull(),
@@ -82,6 +83,7 @@ export const capitulos = pgTable("capitulos", {
   title:       varchar("title", { length: 255 }),
   paginas:     text("paginas"),
   paginasKeys: text("paginasKeys"),
+  conteudo:    text("conteudo"),   // texto do capítulo (novels)
   status:      capStatusEnum("status").default("aguardando").notNull(),
   viewsTotal:  bigint("viewsTotal", { mode: "number" }).default(0).notNull(),
   createdAt:   timestamp("createdAt").defaultNow().notNull(),
