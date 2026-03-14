@@ -69,7 +69,9 @@ const obrasRouter = router({
     .input(z.object({
       title: z.string().min(1), synopsis: z.string().optional(),
       genres: z.array(z.string()).optional(), coverUrl: z.string().optional(),
+      coverKey: z.string().optional(),
       originalAuthor: z.string().optional(),
+      tipo: z.enum(["manga", "novel"]).optional(),
       andamento: z.enum(["em_andamento", "iato", "finalizado"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -177,11 +179,11 @@ const capitulosRouter = router({
   create: protectedProcedure
     .input(z.object({
       obraId: z.number(), numero: z.number(), title: z.string().optional(),
-      paginas: z.array(z.string().url()).min(1).max(100),
-      paginasKeys: z.array(z.string()).min(1).max(100),
+      paginas: z.array(z.string().url()).max(500).optional(),
+      paginasKeys: z.array(z.string()).max(500).optional(),
+      conteudo: z.string().max(500000).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
-      canInteract(ctx.user);
       if (!isTranslatorOrAbove(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
       const obra = await getObraById(input.obraId);
       if (!obra) throw new TRPCError({ code: "NOT_FOUND" });
@@ -192,8 +194,14 @@ const capitulosRouter = router({
         const aguardando = await countCapitulosAguardando(ctx.user.id);
         if (aguardando >= 10) throw new TRPCError({ code: "FORBIDDEN", message: "Você já tem 10 capítulos aguardando. Aguarde antes de enviar mais." });
       }
+      // Validar conteúdo conforme tipo da obra
+      if (obra.tipo === "novel") {
+        if (!input.conteudo || input.conteudo.trim().length < 10) throw new TRPCError({ code: "BAD_REQUEST", message: "O conteúdo do capítulo é obrigatório para novels." });
+      } else {
+        if (!input.paginas || input.paginas.length === 0) throw new TRPCError({ code: "BAD_REQUEST", message: "Adicione pelo menos 1 página." });
+      }
       const status = isOfficialOrAbove(ctx.user.role) ? "aprovado" : "aguardando";
-      await createCapitulo({ obraId: input.obraId, authorId: ctx.user.id, numero: input.numero, title: input.title, paginas: JSON.stringify(input.paginas), paginasKeys: JSON.stringify(input.paginasKeys), status });
+      await createCapitulo({ obraId: input.obraId, authorId: ctx.user.id, numero: input.numero, title: input.title, paginas: input.paginas ? JSON.stringify(input.paginas) : undefined, paginasKeys: input.paginasKeys ? JSON.stringify(input.paginasKeys) : undefined, conteudo: input.conteudo, status });
       return { success: true, status };
     }),
 
