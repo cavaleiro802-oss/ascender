@@ -291,6 +291,11 @@ export default function ObraPage() {
                 {andamentoInfo.label}
               </span>
             )}
+            {(obra as any).tipo === "novel" && (
+              <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full border border-purple-500/40 bg-purple-500/10 text-purple-300">
+                📖 Novel
+              </span>
+            )}
           </div>
           <h1 className="text-2xl sm:text-3xl font-black text-white mb-2 leading-tight">{obra.title}</h1>
           <p className="text-sm text-muted-foreground mb-1">
