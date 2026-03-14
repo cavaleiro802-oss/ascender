@@ -31,6 +31,7 @@ export default function NovaObraPage() {
   const [originalAuthor, setOriginalAuthor] = useState("");
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
   const [andamento, setAndamento] = useState<"em_andamento" | "iato" | "finalizado">("em_andamento");
+  const [tipo, setTipo] = useState<"manga" | "novel">("manga");
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -111,6 +112,7 @@ export default function NovaObraPage() {
         coverUrl,
         coverKey,
         andamento,
+        tipo,
       });
     } catch (e: any) {
       toast.error(e.message || "Erro ao enviar obra.");
@@ -127,6 +129,37 @@ export default function NovaObraPage() {
       <main className="container py-8 max-w-2xl">
         <h1 className="text-2xl font-black text-white mb-6">📚 Nova Obra</h1>
         <div className="space-y-6">
+
+          {/* Tipo de obra */}
+          <div>
+            <Label className="text-white/80 mb-2 block">Tipo de Obra *</Label>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setTipo("manga")}
+                className={`flex-1 py-3 rounded-xl border-2 text-sm font-bold transition-all flex flex-col items-center gap-1 ${
+                  tipo === "manga"
+                    ? "border-primary bg-primary/10 text-white"
+                    : "border-border bg-secondary/30 text-white/40 hover:border-white/30 hover:text-white/70"
+                }`}
+              >
+                <span className="text-2xl">🖼️</span>
+                Manga / Manhwa
+                <span className="text-[10px] font-normal opacity-60">Capítulos com imagens</span>
+              </button>
+              <button
+                onClick={() => setTipo("novel")}
+                className={`flex-1 py-3 rounded-xl border-2 text-sm font-bold transition-all flex flex-col items-center gap-1 ${
+                  tipo === "novel"
+                    ? "border-primary bg-primary/10 text-white"
+                    : "border-border bg-secondary/30 text-white/40 hover:border-white/30 hover:text-white/70"
+                }`}
+              >
+                <span className="text-2xl">📖</span>
+                Novel / Light Novel
+                <span className="text-[10px] font-normal opacity-60">Capítulos em texto</span>
+              </button>
+            </div>
+          </div>
 
           {/* Capa */}
           <div>
