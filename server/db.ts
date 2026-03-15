@@ -369,6 +369,7 @@ export async function listComentarios(obraId: number) {
       createdAt:      comentarios.createdAt,
       autorNome:      users.displayName,
       autorAvatar:    users.avatarUrl,
+      autorCosmeticos: users.cosmeticos,
       parentAutorNome: sql<string | null>`NULL`,
     })
     .from(comentarios)
@@ -389,9 +390,27 @@ export async function listComentarios(obraId: number) {
 }
 export async function listComentariosByCapitulo(capituloId: number) {
   const db = await getDb(); if (!db) return [];
-  return db.select().from(comentarios)
+  const rows = await db
+    .select({
+      id:          comentarios.id,
+      obraId:      comentarios.obraId,
+      capituloId:  comentarios.capituloId,
+      autorId:     comentarios.autorId,
+      parentId:    comentarios.parentId,
+      content:     comentarios.content,
+      createdAt:   comentarios.createdAt,
+      autorNome:   users.displayName,
+      autorAvatar: users.avatarUrl,
+      autorCosmeticos: users.cosmeticos,
+    })
+    .from(comentarios)
+    .leftJoin(users, eq(comentarios.autorId, users.id))
     .where(and(eq(comentarios.capituloId, capituloId), eq(comentarios.deleted, false)))
     .orderBy(asc(comentarios.createdAt));
+  return rows.map((r) => ({
+    ...r,
+    autorNome: r.autorNome ?? `Usuário #${r.autorId}`,
+  }));
 }
 
 export async function getComentarioById(id: number) {
