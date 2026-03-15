@@ -1,3 +1,4 @@
+import { cfPagina, cfAvatar } from "@/lib/imageUtils";
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
@@ -153,7 +154,7 @@ export default function CapituloPage() {
         ) : modo === "scroll" ? (
           <div className="flex flex-col items-center">
             {paginas.map((url, i) => (
-              <img key={i} src={url} alt={`Página ${i + 1}`}
+              <img key={i} src={cfPagina(url)} alt={`Página ${i + 1}`}
                 className="w-full max-w-2xl block"
                 loading={i < 2 ? "eager" : "lazy"}
               />
@@ -161,7 +162,7 @@ export default function CapituloPage() {
           </div>
         ) : (
           <div className="relative flex items-center justify-center min-h-[calc(100vh-3rem)]">
-            <img src={paginas[paginaAtual]} alt={`Página ${paginaAtual + 1}`}
+            <img src={cfPagina(paginas[paginaAtual])} alt={`Página ${paginaAtual + 1}`}
               className="max-h-[calc(100vh-3rem)] max-w-full object-contain"
             />
             {/* [6] Clicar na imagem só troca PÁGINA, nunca capítulo */}
@@ -301,7 +302,7 @@ function ComentariosCapitulo({ capituloId, obraId }: { capituloId: number; obraI
                   <div className="relative w-9 h-9 flex-shrink-0">
                     <div className="w-9 h-9 rounded-full overflow-hidden bg-primary/20 border border-primary/30">
                       {c.autorAvatar
-                        ? <img src={c.autorAvatar} alt={c.autorNome} className="w-full h-full object-cover" />
+                        ? <img src={cfAvatar(c.autorAvatar)} alt={c.autorNome} className="w-full h-full object-cover" />
                         : <div className="w-full h-full flex items-center justify-center text-xs font-bold text-primary">{(c.autorNome?.[0] ?? "?").toUpperCase()}</div>
                       }
                     </div>
@@ -328,4 +329,3 @@ function ComentariosCapitulo({ capituloId, obraId }: { capituloId: number; obraI
     </div>
   );
 }
-
