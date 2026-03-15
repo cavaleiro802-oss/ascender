@@ -1,13 +1,21 @@
 import { useAuth } from "@/hooks/useAuth";
 import { getLoginUrl } from "@/const";
 import { trpc } from "@/lib/trpc";
-import { BookOpen, Clock, Star } from "lucide-react";
+import { BookOpen, Clock, Star, Play } from "lucide-react";
 import { useLocation } from "wouter";
 import Topbar from "@/components/Topbar";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import AscenderLoader from "@/components/AscenderLoader";
+
+function parseGenres(genres?: string | null): string[] {
+  if (!genres) return [];
+  try {
+    const parsed = JSON.parse(genres);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch { return []; }
+}
 
 export default function BibliotecaPage() {
   const { user, isAuthenticated, loading } = useAuth();
@@ -82,7 +90,7 @@ export default function BibliotecaPage() {
                 </Button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3">
                 {favoritos.map((fav: any) => (
                   <FavCard key={fav.id} obraId={fav.obraId} />
                 ))}
@@ -120,19 +128,66 @@ function FavCard({ obraId }: { obraId: number }) {
   const [, navigate] = useLocation();
   const { data: obra } = trpc.obras.byId.useQuery({ id: obraId });
 
-  if (!obra) return null;
+  if (!obra) return (
+    <div className="asc-card overflow-hidden animate-pulse">
+      <div className="aspect-[3/4] bg-secondary/50" />
+      <div className="p-2 space-y-1.5">
+        <div className="h-3 bg-white/10 rounded w-3/4" />
+        <div className="h-2 bg-white/5 rounded w-1/2" />
+      </div>
+    </div>
+  );
+
+  const genres = parseGenres(obra.genres);
+  const caps = (obra as any).ultimosCapitulos ?? [];
 
   return (
     <div
-      className="asc-tile p-3 flex gap-3 items-start cursor-pointer"
       onClick={() => navigate(`/obra/${obraId}`)}
+      className="asc-card overflow-hidden cursor-pointer group transition-all duration-200 hover:border-primary/40 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10"
     >
-      <div className="asc-cover w-12 h-16 flex-shrink-0 flex items-center justify-center">
-        <BookOpen className="w-5 h-5 text-primary/60" />
+      <div className="relative aspect-[3/4] bg-secondary overflow-hidden">
+        {obra.coverUrl ? (
+          <img
+            src={obra.coverUrl}
+            alt={obra.title}
+            loading="lazy"
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        ) : (
+          <div className="w-full h-full bg-gradient-to-br from-secondary to-black/60 flex items-center justify-center">
+            <span className="text-4xl opacity-20">📚</span>
+          </div>
+        )}
+        {obra.tipo === "novel" && (
+          <div className="absolute top-2 left-2">
+            <span className="bg-amber-600/90 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-lg">📖 NOVEL</span>
+          </div>
+        )}
+        {genres[0] && (
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 to-transparent px-2 py-1.5">
+            <span className="text-[10px] text-white/80 font-medium">{genres[0]}</span>
+          </div>
+        )}
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-sm font-bold text-white/90 line-clamp-2 mb-1">{obra.title}</p>
-        <p className="text-xs text-muted-foreground">{obra.status === "aprovada" ? "Disponível" : obra.status}</p>
+      <div className="p-2">
+        <p className="text-xs font-bold text-white leading-tight line-clamp-1 mb-1.5">{obra.title}</p>
+        {caps.length > 0 ? (
+          <div className="space-y-1">
+            {caps.slice(0, 3).map((cap: any) => (
+              <div key={cap.id}
+                className="flex items-center justify-between text-[10px] hover:bg-white/5 rounded px-1 -mx-1 transition-colors"
+                onClick={(e) => { e.stopPropagation(); navigate(`/obra/${obraId}/capitulo/${cap.id}`); }}>
+                <span className="text-white/60 truncate">Cap. {cap.numero}</span>
+                <span className="text-white/30 flex-shrink-0">
+                  {new Date(cap.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-[10px] text-muted-foreground">Sem capítulos</p>
+        )}
       </div>
     </div>
   );
