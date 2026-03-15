@@ -328,3 +328,4 @@ function ComentariosCapitulo({ capituloId, obraId }: { capituloId: number; obraI
     </div>
   );
 }
+
