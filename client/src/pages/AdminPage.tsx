@@ -144,7 +144,13 @@ function ObrasTab({ isSupreme }: { isSupreme: boolean }) {
   const { data: allObras = [] } = trpc.obras.listAll.useQuery({ status: "aprovada" });
   const [changeAuthorObraId, setChangeAuthorObraId] = useState<number | null>(null);
   const [newAuthorId, setNewAuthorId] = useState("");
-  const [tab, setTab] = useState<"pending" | "all">("pending");
+  const [tab, setTab] = useState<"pending" | "all" | "tradutor">("pending");
+  const [buscaTradutor, setBuscaTradutor] = useState("");
+  const [translatorIdBusca, setTranslatorIdBusca] = useState<number | null>(null);
+  const { data: obrasTradutor = [] } = trpc.obras.byTranslatorId.useQuery(
+    { translatorId: translatorIdBusca! },
+    { enabled: translatorIdBusca !== null }
+  );
 
   const approve      = trpc.obras.approve.useMutation({ onSuccess: () => { utils.obras.pending.invalidate(); toast.success("Obra atualizada!"); }, onError: (e) => toast.error(e.message) });
   const changeAuthor = trpc.obras.changeAuthor.useMutation({ onSuccess: () => { setChangeAuthorObraId(null); setNewAuthorId(""); toast.success("Dono atualizado!"); }, onError: (e) => toast.error(e.message) });
@@ -182,10 +188,48 @@ function ObrasTab({ isSupreme }: { isSupreme: boolean }) {
 
   return (
     <div className="space-y-3">
-      <div className="flex gap-2 mb-4">
-        <Button size="sm" onClick={() => setTab("pending")} className={tab === "pending" ? "bg-primary text-white" : "bg-secondary text-white/60 border-border border"}>Pendentes ({pending.length})</Button>
-        <Button size="sm" onClick={() => setTab("all")}     className={tab === "all"     ? "bg-primary text-white" : "bg-secondary text-white/60 border-border border"}>Todas ({allObras.length})</Button>
+      <div className="flex gap-2 mb-4 flex-wrap">
+        <Button size="sm" onClick={() => setTab("pending")}  className={tab === "pending"  ? "bg-primary text-white" : "bg-secondary text-white/60 border-border border"}>Pendentes ({pending.length})</Button>
+        <Button size="sm" onClick={() => setTab("all")}      className={tab === "all"      ? "bg-primary text-white" : "bg-secondary text-white/60 border-border border"}>Todas ({allObras.length})</Button>
+        <Button size="sm" onClick={() => setTab("tradutor")} className={tab === "tradutor" ? "bg-purple-600 text-white" : "bg-secondary text-white/60 border-border border"}>Por Tradutor</Button>
       </div>
+
+      {/* [11] Busca por ID do tradutor */}
+      {tab === "tradutor" && (
+        <div className="mb-4 space-y-3">
+          <div className="flex gap-2">
+            <Input
+              type="number"
+              placeholder="ID do tradutor (ex: 42)"
+              value={buscaTradutor}
+              onChange={(e) => setBuscaTradutor(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && setTranslatorIdBusca(parseInt(buscaTradutor))}
+              className="bg-secondary border-border text-white max-w-xs"
+            />
+            <Button
+              className="bg-purple-600 hover:bg-purple-700 text-white"
+              onClick={() => {
+                const id = parseInt(buscaTradutor);
+                if (isNaN(id)) return toast.error("ID inválido.");
+                setTranslatorIdBusca(id);
+              }}
+            >
+              Buscar Obras
+            </Button>
+          </div>
+          {translatorIdBusca !== null && (
+            <p className="text-xs text-muted-foreground">
+              Tradutor #{translatorIdBusca} — {obrasTradutor.length} obra(s)
+            </p>
+          )}
+          {obrasTradutor.length === 0 && translatorIdBusca !== null ? (
+            <div className="asc-card p-8 text-center text-muted-foreground">Nenhuma obra para esse tradutor.</div>
+          ) : (
+            obrasTradutor.map((o: any) => renderObraCard(o, false))
+          )}
+        </div>
+      )}
+
       {tab === "pending" && (pending.length === 0 ? <div className="asc-card p-8 text-center text-muted-foreground">Nenhuma obra pendente.</div> : pending.map((o: any) => renderObraCard(o, true)))}
       {tab === "all"     && (allObras.length === 0 ? <div className="asc-card p-8 text-center text-muted-foreground">Nenhuma obra aprovada.</div>  : allObras.map((o: any) => renderObraCard(o, false)))}
     </div>
