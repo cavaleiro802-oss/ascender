@@ -9,7 +9,7 @@ export const roleEnum = pgEnum("role", [
   "criador", "admin_senhor", "admin_supremo",
 ]);
 export const obraStatusEnum    = pgEnum("obra_status",    ["em_espera", "aprovada", "rejeitada"]);
-export const obraAndamentoEnum = pgEnum("obra_andamento", ["em_andamento", "iato", "finalizado"]);
+export const obraAndamentoEnum = pgEnum("obra_andamento", ["em_andamento", "hiato", "finalizado"]);
 export const obraTipoEnum    = pgEnum("obra_tipo",      ["manga", "novel"]);
 export const capStatusEnum     = pgEnum("cap_status",     ["aguardando", "aprovado", "rejeitado"]);
 export const reportTipoEnum    = pgEnum("report_tipo",    ["imagem_faltando", "cap_nao_carrega", "erro_traducao", "outro"]);
@@ -141,6 +141,7 @@ export const viewsRegistro = pgTable("views_registro", {
 export const comentarios = pgTable("comentarios", {
   id:        integer("id").primaryKey().generatedAlwaysAsIdentity(),
   obraId:    integer("obraId").notNull(),
+  capituloId: integer("capituloId"),   // null = comentário da obra, id = comentário do capítulo
   autorId:   integer("autorId").notNull(),
   parentId:  integer("parentId"),   // null = raiz, id = resposta
   content:   text("content").notNull(),
@@ -149,6 +150,7 @@ export const comentarios = pgTable("comentarios", {
   updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 }, (t) => ({
   obraIdx:    index("com_obra_idx").on(t.obraId),
+  capIdx:     index("com_cap_idx").on(t.capituloId),
   createdIdx: index("com_created_idx").on(t.createdAt),
   autorIdx:   index("com_autor_idx").on(t.autorId),
   parentIdx:  index("com_parent_idx").on(t.parentId),
