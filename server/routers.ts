@@ -71,7 +71,7 @@ const obrasRouter = router({
       genres: z.array(z.string()).optional(), coverUrl: z.string().optional(),
       coverKey: z.string().optional(),
       originalAuthor: z.string().optional(),
-      tipo: z.enum(["manga", "novel"]).optional(),
+      tipo: z.enum(["manga", "novel", "hq"]).optional(),
       andamento: z.enum(["em_andamento", "hiato", "finalizado"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -325,6 +325,9 @@ const favoritosRouter = router({
 // ─── Leitura Router ───────────────────────────────────────────────────────────
 const leituraRouter = router({
   history: protectedProcedure.query(({ ctx }) => getHistoricoLeitura(ctx.user.id)),
+  update:  protectedProcedure
+    .input(z.object({ capituloId: z.number(), obraId: z.number(), progresso: z.number().min(0).max(100) }))
+    .mutation(({ ctx, input }) => upsertHistoricoLeitura({ userId: ctx.user.id, ...input })),
   upsert:  protectedProcedure
     .input(z.object({ obraId: z.number(), capituloId: z.number(), progresso: z.number().min(0).max(100) }))
     .mutation(({ ctx, input }) => upsertHistoricoLeitura({ userId: ctx.user.id, ...input })),
