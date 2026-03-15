@@ -45,8 +45,8 @@ const PROPAGANDAS = [
     id: "loja",
     icon: "🛍",
     tag: "ASCENDER LOJA",
-    titulo: "Cosméticos e molduras exclusivas",
-    subtitulo: "Personalize seu perfil com itens únicos da loja",
+    titulo: "Comente com estilo exclusivo",
+    subtitulo: "Molduras, cores de comentário e frames exclusivos para membros",
     btnLabel: "Ver Loja",
     rota: "/loja",
     gradient: "from-[#000d10] via-[#001116] to-[#00080d]",
@@ -255,6 +255,11 @@ function ObraCard({ obra, onClick }: { obra: any; onClick: () => void }) {
             <span className="text-[10px] text-white/80 font-medium">{genres[0]}</span>
           </div>
         )}
+        {obra.tipo === "novel" && (
+          <div className="absolute top-2 left-2">
+            <span className="bg-amber-600/90 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-lg">📖 NOVEL</span>
+          </div>
+        )}
         {caps.length > 0 && isNovo(caps[0].createdAt) && (
           <div className="absolute top-2 right-2">
             <span className="bg-green-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-lg">NEW</span>
@@ -434,9 +439,6 @@ export default function Home() {
             {/* Hero */}
             {hotObras.length > 0 && <HeroBanner obras={hotObras.slice(0, 6)} onObraClick={goObra} />}
 
-            {/* Banner ASCENDER */}
-            {showBanner && <PropagandaBanner onClose={closeBanner} onAction={(acao) => { if (acao === "pedido_cargo") setShowPedidoModal(true); }} />}
-
             {/* Carrosséis */}
             {isTranslator && minhasObras.length > 0 && (
               <Carrossel
@@ -448,6 +450,9 @@ export default function Home() {
             )}
             <Carrossel obras={hotObras} titulo="Em Alta" icone={<Flame className="w-5 h-5 text-orange-400" />} onObraClick={goObra} />
             <Carrossel obras={mostObras} titulo="Mais Lidos" icone={<Eye className="w-5 h-5 text-blue-400" />} onObraClick={goObra} />
+
+            {/* Banner ASCENDER — só no painel central, abaixo dos carrosséis */}
+            {showBanner && <PropagandaBanner onClose={closeBanner} onAction={(acao) => { if (acao === "pedido_cargo") setShowPedidoModal(true); }} />}
           </>
         )}
 
@@ -510,3 +515,5 @@ export default function Home() {
     </div>
   );
       }
+
+       
