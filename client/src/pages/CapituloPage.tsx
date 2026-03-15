@@ -291,22 +291,37 @@ function ComentariosCapitulo({ capituloId, obraId }: { capituloId: number; obraI
           <p className="text-white/20 text-sm text-center py-8">Nenhum comentário ainda. Seja o primeiro!</p>
         ) : (
           <div className="space-y-3">
-            {(comentarios as any[]).map((c) => (
-              <div key={c.id} className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex-shrink-0 flex items-center justify-center text-xs font-bold text-primary">
-                  {(c.autorId ?? "?").toString().slice(-2)}
-                </div>
-                <div className="flex-1 bg-white/5 rounded-xl px-4 py-2.5">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-bold text-white/70">#{c.autorId}</span>
-                    <span className="text-[10px] text-white/20">
-                      {new Date(c.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
-                    </span>
+            {(comentarios as any[]).map((c) => {
+              const cosmeticos = (() => { try { return JSON.parse(c.autorCosmeticos ?? "{}"); } catch { return {}; } })();
+              const molduraUrl = cosmeticos?.moldura?.mediaUrl;
+              const corComentario = cosmeticos?.cor_comentario?.mediaUrl;
+              return (
+                <div key={c.id} className="flex gap-3">
+                  {/* Avatar com moldura */}
+                  <div className="relative w-9 h-9 flex-shrink-0">
+                    <div className="w-9 h-9 rounded-full overflow-hidden bg-primary/20 border border-primary/30">
+                      {c.autorAvatar
+                        ? <img src={c.autorAvatar} alt={c.autorNome} className="w-full h-full object-cover" />
+                        : <div className="w-full h-full flex items-center justify-center text-xs font-bold text-primary">{(c.autorNome?.[0] ?? "?").toUpperCase()}</div>
+                      }
+                    </div>
+                    {molduraUrl && (
+                      <img src={molduraUrl} alt="moldura" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ zIndex: 2 }} />
+                    )}
                   </div>
-                  <p className="text-sm text-white/80 leading-relaxed">{c.content}</p>
+                  {/* Balão do comentário */}
+                  <div className="flex-1 bg-white/5 rounded-xl px-4 py-2.5">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-bold text-white/80">{c.autorNome ?? `Usuário #${c.autorId}`}</span>
+                      <span className="text-[10px] text-white/20">
+                        {new Date(c.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    <p className="text-sm leading-relaxed" style={{ color: corComentario ?? "rgba(255,255,255,0.82)" }}>{c.content}</p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
