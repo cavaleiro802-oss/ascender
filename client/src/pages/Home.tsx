@@ -118,15 +118,36 @@ function PropagandaBanner({ onClose, onAction }: { onClose: () => void; onAction
             <p className="text-white/40 text-xs hidden sm:block">{p.subtitulo}</p>
           </div>
           <div className="flex flex-col items-end gap-2 flex-shrink-0">
-            <Button
-              size="sm"
-              
-              className={`bg-gradient-to-r ${p.btnCls} text-white font-bold shadow-lg border-0 px-4 sm:px-5`}
-              onClick={() => { if ((p as any).acao) { onAction?.((p as any).acao); } else if (p.rota) { navigate(p.rota); } }}
-            >
-              {p.btnLabel}
-            </Button>
-            {/* Dots para trocar propaganda */}
+            <div className="flex items-center gap-2">
+              <Button
+                size="sm"
+                className={`bg-gradient-to-r ${p.btnCls} text-white font-bold shadow-lg border-0 px-4 sm:px-5`}
+                onClick={() => { if ((p as any).acao) { onAction?.((p as any).acao); } else if (p.rota) { navigate(p.rota); } }}
+              >
+                {p.btnLabel}
+              </Button>
+              {/* Menu 3 pontos */}
+              <div className="relative group/menu">
+                <button className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 flex items-center justify-center transition-colors">
+                  <span className="text-white/70 font-bold text-xs leading-none">•••</span>
+                </button>
+                <div className="absolute right-0 top-9 bg-black/95 border border-white/10 rounded-xl shadow-2xl w-44 py-1.5 hidden group-hover/menu:block z-50">
+                  <button onClick={() => navigate("/loja")}
+                    className="w-full text-left px-4 py-2 text-sm text-white/80 hover:text-white hover:bg-white/5 flex items-center gap-2 transition-colors">
+                    🛍️ Ver Loja
+                  </button>
+                  <button onClick={() => onAction?.("pedido_cargo")}
+                    className="w-full text-left px-4 py-2 text-sm text-white/80 hover:text-white hover:bg-white/5 flex items-center gap-2 transition-colors">
+                    ⚔️ Ser Tradutor
+                  </button>
+                  <div className="border-t border-white/5 my-1" />
+                  <button onClick={() => navigate("/")}
+                    className="w-full text-left px-4 py-2 text-sm text-white/50 hover:text-white hover:bg-white/5 flex items-center gap-2 transition-colors">
+                    📖 Como funciona
+                  </button>
+                </div>
+              </div>
+            </div>
             {PROPAGANDAS.length > 1 && (
               <div className="flex gap-1.5">
                 {PROPAGANDAS.map((_, i) => (
@@ -258,6 +279,11 @@ function ObraCard({ obra, onClick }: { obra: any; onClick: () => void }) {
         {obra.tipo === "novel" && (
           <div className="absolute top-2 left-2">
             <span className="bg-amber-600/90 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-lg">📖 NOVEL</span>
+          </div>
+        )}
+        {(obra.tipo as any) === "hq" && (
+          <div className="absolute top-2 left-2">
+            <span className="bg-yellow-600/90 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-lg">💥 HQ</span>
           </div>
         )}
         {caps.length > 0 && isNovo(caps[0].createdAt) && (
@@ -515,5 +541,7 @@ export default function Home() {
     </div>
   );
       }
+
+       
 
        
