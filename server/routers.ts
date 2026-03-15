@@ -9,7 +9,7 @@ import {
   createReport, criarNotificacao, criarPedidoCargo, deletarSessao, deleteComentario,
   deleteCapitulo, getCapituloById, getComentarioById, getCurtida, getFavorito, getHistoricoLeitura, updateCapituloNumero,
   getObraById, getPublicLink, getPlatformStats, getUserById, getUserByOpenId,
-  incrementCapituloViews, incrementObraViews, listCapitulos, listComentarios,
+  incrementCapituloViews, incrementObraViews, listCapitulos, listComentarios, listComentariosByCapitulo,
   listFavoritos, listHistoricoAdm, listNotificacoes, listObras, listObrasByAuthor,
   listPedidosCargo, listPendingCapitulos, listPendingObras, listReports, listUsers,
   logAdm, marcarNotificacaoLida, resolveReport, setPublicLink, toggleCurtida,
