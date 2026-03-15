@@ -1,4 +1,4 @@
-import { and, desc, eq, like, sql, lt } from "drizzle-orm";
+import { and, asc, desc, eq, like, sql, lt } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import crypto from "crypto";
@@ -173,15 +173,25 @@ export async function listObras(opts: { status?: string; genre?: string; search?
 
   // Agrupar 3 mais recentes por obra
   const capsPorObra: Record<number, typeof caps> = {};
+  const ultimoCapPorObra: Record<number, Date> = {};
   for (const cap of caps) {
     if (!capsPorObra[cap.obraId]) capsPorObra[cap.obraId] = [];
     if (capsPorObra[cap.obraId].length < 3) capsPorObra[cap.obraId].push(cap);
+    if (!ultimoCapPorObra[cap.obraId]) ultimoCapPorObra[cap.obraId] = new Date(cap.createdAt);
   }
 
-  return obrasList.map((o) => ({
+  const obrasComCaps = obrasList.map((o) => ({
     ...o,
     ultimosCapitulos: capsPorObra[o.id] ?? [],
+    _ultimoCapAt: ultimoCapPorObra[o.id] ?? new Date(o.updatedAt),
   }));
+
+  // Para "recent": ordenar por data do último capítulo aprovado (obras sem caps ficam por updatedAt)
+  if (sort === "recent") {
+    obrasComCaps.sort((a, b) => b._ultimoCapAt.getTime() - a._ultimoCapAt.getTime());
+  }
+
+  return obrasComCaps.map(({ _ultimoCapAt, ...o }) => o);
 }
 export async function listObrasByAuthor(authorId: number) {
   const db = await getDb(); if (!db) return [];
@@ -192,12 +202,12 @@ export async function getObraById(id: number) {
   const result = await db.select().from(obras).where(eq(obras.id, id)).limit(1);
   return result[0];
 }
-export async function createObra(data: { title: string; synopsis?: string; genres?: string[]; coverUrl?: string; coverKey?: string; authorId: number; originalAuthor?: string; tipo?: "manga" | "novel"; status: "em_espera" | "aprovada"; andamento?: "em_andamento" | "iato" | "finalizado"; }) {
+export async function createObra(data: { title: string; synopsis?: string; genres?: string[]; coverUrl?: string; coverKey?: string; authorId: number; originalAuthor?: string; tipo?: "manga" | "novel"; status: "em_espera" | "aprovada"; andamento?: "em_andamento" | "hhiato" | "finalizado"; }) {
   const db = await getDb(); if (!db) throw new Error("DB unavailable");
   const result = await db.insert(obras).values({ ...data, genres: data.genres ? JSON.stringify(data.genres) : null }).returning();
   return result[0];
 }
-export async function updateObra(obraId: number, data: { title?: string; synopsis?: string; genres?: string[]; andamento?: "em_andamento" | "iato" | "finalizado"; coverUrl?: string; }) {
+export async function updateObra(obraId: number, data: { title?: string; synopsis?: string; genres?: string[]; andamento?: "em_andamento" | "hhiato" | "finalizado"; coverUrl?: string; }) {
   const db = await getDb(); if (!db) return;
   const set: Record<string, unknown> = { updatedAt: new Date() };
   if (data.title !== undefined) set.title = data.title;
@@ -377,12 +387,19 @@ export async function listComentarios(obraId: number) {
     parentAutorNome: r.parentId ? (autorPorId[r.parentId] ?? null) : null,
   }));
 }
+export async function listComentariosByCapitulo(capituloId: number) {
+  const db = await getDb(); if (!db) return [];
+  return db.select().from(comentarios)
+    .where(and(eq(comentarios.capituloId, capituloId), eq(comentarios.deleted, false)))
+    .orderBy(asc(comentarios.createdAt));
+}
+
 export async function getComentarioById(id: number) {
   const db = await getDb(); if (!db) return undefined;
   const result = await db.select().from(comentarios).where(eq(comentarios.id, id)).limit(1);
   return result[0];
 }
-export async function createComentario(data: { obraId: number; autorId: number; content: string; parentId?: number }) {
+export async function createComentario(data: { obraId: number; capituloId?: number; autorId: number; content: string; parentId?: number }) {
   const db = await getDb(); if (!db) throw new Error("DB unavailable");
   const result = await db.insert(comentarios).values(data).returning();
   return result[0];
