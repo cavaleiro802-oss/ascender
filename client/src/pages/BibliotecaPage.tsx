@@ -205,8 +205,11 @@ function HistoricoCard({ entry }: { entry: any }) {
       className="asc-tile p-3 flex gap-3 items-center cursor-pointer"
       onClick={() => navigate(`/obra/${entry.obraId}/capitulo/${entry.capituloId}`)}
     >
-      <div className="asc-cover w-10 h-14 flex-shrink-0 flex items-center justify-center">
-        <BookOpen className="w-4 h-4 text-primary/60" />
+      <div className="w-10 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-secondary border border-border">
+        {obra.coverUrl
+          ? <img src={obra.coverUrl} alt={obra.title} className="w-full h-full object-cover" />
+          : <div className="w-full h-full flex items-center justify-center"><BookOpen className="w-4 h-4 text-primary/60" /></div>
+        }
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-bold text-white/90 truncate">{obra.title}</p>
@@ -219,3 +222,4 @@ function HistoricoCard({ entry }: { entry: any }) {
     </div>
   );
 }
+
