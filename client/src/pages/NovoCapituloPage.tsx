@@ -197,7 +197,7 @@ function AbaUnico({ obraId }: { obraId: string }) {
 
       <div>
         <Label className="text-white/80 mb-2 block">
-          Páginas * <span className="text-muted-foreground font-normal">({arquivos.length}/100 — em ordem)</span>
+          Páginas * <span className="text-muted-foreground font-normal">({arquivos.length} — em ordem)</span>
         </Label>
         <div onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} onClick={() => fileRef.current?.click()}
           className="border-2 border-dashed border-border hover:border-primary/50 rounded-xl p-8 text-center cursor-pointer transition-colors group">
