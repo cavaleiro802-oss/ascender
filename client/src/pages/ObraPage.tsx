@@ -35,10 +35,17 @@ const ANDAMENTO_CONFIG = {
   finalizado:   { label: "Finalizado",   cls: "text-blue-400 border-blue-500/40 bg-blue-500/10" },
 } as const;
 
+// Tipos de mídia (igual ao NovaObraPage)
+const TIPOS_MIDIA_LIST = ["Manga", "Manhwa", "Manhua", "Novel", "Light Novel", "Webtoon", "HQ", "Quadrinhos", "Hentai"];
+
+// Gêneros (igual ao NovaObraPage)
 const GENRES_LIST = [
-  "Novel","Manhwar","Manga","Ação","Aventura","Comédia","Drama","Fantasia",
-  "Horror","Mistério","Romance","Sci-Fi","Slice of Life","Culinaria",
-  "Supernatural","Esportes","Histórico","Psicológico","Ecchi",
+  "Ação", "Aventura", "Comédia", "Drama", "Fantasia", "Horror",
+  "Mistério", "Romance", "Sci-Fi", "Slice of Life", "Culinária",
+  "Supernatural", "Esportes", "Histórico", "Psicológico", "Ecchi",
+  "Isekai", "Shounen", "Shoujo", "Seinen", "Josei", "Yaoi", "Yuri",
+  "Mahou Shoujo", "Mecha", "Policial", "Corrida", "Artes Marciais",
+  "Reencarnação", "Sistema", "Harem", "Vilã", "Dungeons",
 ];
 
 const CAPS_PER_PAGE = 40;
@@ -422,6 +429,18 @@ export default function ObraPage() {
             </div>
             <div>
               <label className="text-xs text-white/50 mb-1.5 block">Gêneros (máx. 5)</label>
+
+              <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1">Tipo de Mídia</p>
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {TIPOS_MIDIA_LIST.map((g) => (
+                  <button key={g} onClick={() => toggleEditGenre(g)}
+                    className={`px-2.5 py-0.5 rounded-full text-xs border transition-colors ${editGenres.includes(g) ? "bg-purple-600 border-purple-500 text-white" : "border-purple-800/40 text-purple-300/50 hover:border-purple-500/50 hover:text-purple-200"}`}>
+                    {g}
+                  </button>
+                ))}
+              </div>
+              <div className="border-t border-border/30 mb-2" />
+              <p className="text-[10px] text-white/30 uppercase tracking-wider mb-1">Gêneros</p>
               <div className="flex flex-wrap gap-1.5">
                 {GENRES_LIST.map((g) => (
                   <button key={g} onClick={() => toggleEditGenre(g)}
