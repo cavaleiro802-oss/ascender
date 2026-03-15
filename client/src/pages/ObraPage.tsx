@@ -30,7 +30,7 @@ function parseGenres(genres?: string | null): string[] {
 
 const ANDAMENTO_CONFIG = {
   em_andamento: { label: "Em Andamento", cls: "text-green-400 border-green-500/40 bg-green-500/10" },
-  iato:         { label: "Iato",         cls: "text-yellow-400 border-yellow-500/40 bg-yellow-500/10" },
+  hiato:        { label: "Hiato",        cls: "text-yellow-400 border-yellow-500/40 bg-yellow-500/10" },
   finalizado:   { label: "Finalizado",   cls: "text-blue-400 border-blue-500/40 bg-blue-500/10" },
 } as const;
 
