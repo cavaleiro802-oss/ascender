@@ -165,6 +165,18 @@ export default function NovaObraPage() {
                 Novel / Light Novel
                 <span className="text-[10px] font-normal opacity-60">Capítulos em texto</span>
               </button>
+              <button
+                onClick={() => setTipo("hq" as any)}
+                className={`flex-1 py-3 rounded-xl border-2 text-sm font-bold transition-all flex flex-col items-center gap-1 ${
+                  (tipo as any) === "hq"
+                    ? "border-yellow-500 bg-yellow-500/10 text-white"
+                    : "border-border bg-secondary/30 text-white/40 hover:border-white/30 hover:text-white/70"
+                }`}
+              >
+                <span className="text-2xl">💥</span>
+                HQ / Quadrinhos
+                <span className="text-[10px] font-normal opacity-60">Capítulos com imagens</span>
+              </button>
             </div>
           </div>
 
@@ -288,4 +300,5 @@ export default function NovaObraPage() {
     </div>
   );
 }
+
 
