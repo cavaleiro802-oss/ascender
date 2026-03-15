@@ -71,7 +71,7 @@ const obrasRouter = router({
       genres: z.array(z.string()).optional(), coverUrl: z.string().optional(),
       coverKey: z.string().optional(),
       originalAuthor: z.string().optional(),
-      tipo: z.enum(["manga", "novel", "hq"]).optional(),
+      tipo: z.enum(["manga", "novel"]).optional(),
       andamento: z.enum(["em_andamento", "hiato", "finalizado"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
