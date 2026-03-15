@@ -72,7 +72,7 @@ const obrasRouter = router({
       coverKey: z.string().optional(),
       originalAuthor: z.string().optional(),
       tipo: z.enum(["manga", "novel"]).optional(),
-      andamento: z.enum(["em_andamento", "iato", "finalizado"]).optional(),
+      andamento: z.enum(["em_andamento", "hiato", "finalizado"]).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       canInteract(ctx.user);
@@ -88,7 +88,7 @@ const obrasRouter = router({
     .input(z.object({
       id: z.number(), title: z.string().min(1).optional(), synopsis: z.string().optional(),
       genres: z.array(z.string()).optional(),
-      andamento: z.enum(["em_andamento", "iato", "finalizado"]).optional(),
+      andamento: z.enum(["em_andamento", "hiato", "finalizado"]).optional(),
       coverUrl: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -154,6 +154,13 @@ const obrasRouter = router({
     if (!isTranslatorOrAbove(ctx.user.role)) return [];
     return listObrasByAuthor(ctx.user.id);
   }),
+
+  byTranslatorId: protectedProcedure
+    .input(z.object({ translatorId: z.number() }))
+    .query(({ ctx, input }) => {
+      if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
+      return listObrasByAuthor(input.translatorId);
+    }),
 });
 
 // ─── Capítulos Router ─────────────────────────────────────────────────────────
@@ -264,13 +271,17 @@ const capitulosRouter = router({
 const comentariosRouter = router({
   list: publicProcedure.input(z.object({ obraId: z.number() })).query(({ input }) => listComentarios(input.obraId)),
 
+  listByCapitulo: publicProcedure
+    .input(z.object({ capituloId: z.number() }))
+    .query(({ input }) => listComentariosByCapitulo(input.capituloId)),
+
   create: protectedProcedure
-    .input(z.object({ obraId: z.number(), content: z.string().min(1).max(500), parentId: z.number().optional() }))
+    .input(z.object({ obraId: z.number(), capituloId: z.number().optional(), content: z.string().min(1).max(500), parentId: z.number().optional() }))
     .mutation(async ({ ctx, input }) => {
       canInteract(ctx.user);
       const rl = checkRateLimit({ key: `comentario:${ctx.user.id}`, ...LIMITS.comentario });
       if (!rl.allowed) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `Muitos comentários. Aguarde ${rl.retryAfterSec}s.` });
-      await createComentario({ obraId: input.obraId, autorId: ctx.user.id, content: input.content, parentId: input.parentId });
+      await createComentario({ obraId: input.obraId, capituloId: input.capituloId, autorId: ctx.user.id, content: input.content, parentId: input.parentId });
       // Notificar autor do comentário pai se for resposta
       if (input.parentId) {
         const pai = await getComentarioById(input.parentId);
