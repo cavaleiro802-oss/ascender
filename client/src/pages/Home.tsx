@@ -1,3 +1,4 @@
+import { cfCapa } from "@/lib/imageUtils";
 import { useState, useRef, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { useAuth } from "@/hooks/useAuth";
@@ -195,7 +196,7 @@ function HeroBanner({ obras, onObraClick }: { obras: any[]; onObraClick: (id: nu
         {/* Cover */}
         <div className="flex-shrink-0 w-28 sm:w-40 lg:w-48 aspect-[3/4] rounded-xl overflow-hidden border-2 border-white/10 shadow-2xl shadow-black/60">
           {obra.coverUrl ? (
-            <img src={obra.coverUrl} alt={obra.title} className="w-full h-full object-cover" />
+            <img src={cfCapa(obra.coverUrl)} alt={obra.title} className="w-full h-full object-cover" />
           ) : (
             <div className="w-full h-full bg-secondary flex items-center justify-center">
               <BookOpen className="w-8 h-8 text-primary/50" />
@@ -261,7 +262,7 @@ function ObraCard({ obra, onClick }: { obra: any; onClick: () => void }) {
       <div className="relative aspect-[3/4] bg-secondary overflow-hidden">
         {obra.coverUrl ? (
           <img
-            src={obra.coverUrl}
+            src={cfCapa(obra.coverUrl)}
             alt={obra.title}
             loading="lazy"
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
@@ -539,4 +540,3 @@ export default function Home() {
       }
 
        
-
