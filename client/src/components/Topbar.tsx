@@ -1,6 +1,6 @@
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
-import { Bell, BookOpen, ChevronDown, Copy, Library, LogIn, LogOut, Plus, Shield, User } from "lucide-react";
+import { Bell, BookOpen, ChevronDown, Copy, Library, LogIn, LogOut, Plus, Shield, ShoppingBag, User } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "wouter";
 import { Button } from "./ui/button";
@@ -149,6 +149,9 @@ export default function Topbar() {
                     <DropdownMenuItem asChild>
                       <Link href="/biblioteca" className="cursor-pointer"><Library className="w-4 h-4 mr-2" /> Minha Biblioteca</Link>
                     </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link href="/loja" className="cursor-pointer"><ShoppingBag className="w-4 h-4 mr-2 text-blue-400" /> Loja Ascender</Link>
+                    </DropdownMenuItem>
                     {isUsuarioComum && (
                       <>
                         <DropdownMenuSeparator />
@@ -208,3 +211,4 @@ export default function Topbar() {
     </>
   );
 }
+
