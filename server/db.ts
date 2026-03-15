@@ -202,12 +202,12 @@ export async function getObraById(id: number) {
   const result = await db.select().from(obras).where(eq(obras.id, id)).limit(1);
   return result[0];
 }
-export async function createObra(data: { title: string; synopsis?: string; genres?: string[]; coverUrl?: string; coverKey?: string; authorId: number; originalAuthor?: string; tipo?: "manga" | "novel"; status: "em_espera" | "aprovada"; andamento?: "em_andamento" | "hhiato" | "finalizado"; }) {
+export async function createObra(data: { title: string; synopsis?: string; genres?: string[]; coverUrl?: string; coverKey?: string; authorId: number; originalAuthor?: string; tipo?: "manga" | "novel"; status: "em_espera" | "aprovada"; andamento?: "em_andamento" | "hiato" | "finalizado"; }) {
   const db = await getDb(); if (!db) throw new Error("DB unavailable");
   const result = await db.insert(obras).values({ ...data, genres: data.genres ? JSON.stringify(data.genres) : null }).returning();
   return result[0];
 }
-export async function updateObra(obraId: number, data: { title?: string; synopsis?: string; genres?: string[]; andamento?: "em_andamento" | "hhiato" | "finalizado"; coverUrl?: string; }) {
+export async function updateObra(obraId: number, data: { title?: string; synopsis?: string; genres?: string[]; andamento?: "em_andamento" | "hiato" | "finalizado"; coverUrl?: string; }) {
   const db = await getDb(); if (!db) return;
   const set: Record<string, unknown> = { updatedAt: new Date() };
   if (data.title !== undefined) set.title = data.title;
