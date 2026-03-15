@@ -146,6 +146,12 @@ export default function Topbar() {
                     <DropdownMenuItem asChild>
                       <Link href="/perfil" className="cursor-pointer"><User className="w-4 h-4 mr-2" /> Meu Perfil</Link>
                     </DropdownMenuItem>
+                    {isAdmin && (
+                      <DropdownMenuItem asChild>
+                        <Link href="/admin" className="cursor-pointer"><Shield className="w-4 h-4 mr-2 text-primary" /> Painel Admin</Link>
+                      </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
                     <DropdownMenuItem asChild>
                       <Link href="/biblioteca" className="cursor-pointer"><Library className="w-4 h-4 mr-2" /> Minha Biblioteca</Link>
                     </DropdownMenuItem>
@@ -182,11 +188,6 @@ export default function Topbar() {
                           </>
                         )}
                       </>
-                    )}
-                    {isAdmin && (
-                      <DropdownMenuItem asChild>
-                        <Link href="/admin" className="cursor-pointer"><Shield className="w-4 h-4 mr-2" /> Painel Admin</Link>
-                      </DropdownMenuItem>
                     )}
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => logout()} className="text-red-400 cursor-pointer">
