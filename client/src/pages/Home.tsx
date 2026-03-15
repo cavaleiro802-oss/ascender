@@ -281,11 +281,7 @@ function ObraCard({ obra, onClick }: { obra: any; onClick: () => void }) {
             <span className="bg-amber-600/90 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-lg">📖 NOVEL</span>
           </div>
         )}
-        {(obra.tipo as any) === "hq" && (
-          <div className="absolute top-2 left-2">
-            <span className="bg-yellow-600/90 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-lg">💥 HQ</span>
-          </div>
-        )}
+
         {caps.length > 0 && isNovo(caps[0].createdAt) && (
           <div className="absolute top-2 right-2">
             <span className="bg-green-500 text-white text-[9px] font-black px-1.5 py-0.5 rounded shadow-lg">NEW</span>
@@ -544,4 +540,3 @@ export default function Home() {
 
        
 
-       
