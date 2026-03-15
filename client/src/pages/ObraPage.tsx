@@ -1,3 +1,4 @@
+import { cfCapa, cfAvatar } from "@/lib/imageUtils";
 import { useAuth } from "@/hooks/useAuth";
 import { trpc } from "@/lib/trpc";
 import {
@@ -55,7 +56,7 @@ function Comentario({
     <div className="flex gap-3 group">
       <div className="w-8 h-8 rounded-full bg-primary/20 flex-shrink-0 flex items-center justify-center text-xs font-bold text-primary mt-0.5">
         {c.autorAvatar ? (
-          <img src={c.autorAvatar} alt={nome} className="w-full h-full object-cover rounded-full" />
+          <img src={cfAvatar(c.autorAvatar)} alt={nome} className="w-full h-full object-cover rounded-full" />
         ) : inicial}
       </div>
       <div className="flex-1 min-w-0">
@@ -259,7 +260,7 @@ export default function ObraPage() {
         <div className="absolute left-1/2 -translate-x-1/2 z-10" style={{ bottom: 0 }}>
           <div className="relative w-32 sm:w-40 aspect-[3/4] rounded-xl overflow-hidden border-2 border-border shadow-2xl shadow-black">
             {obra.coverUrl ? (
-              <img src={obra.coverUrl} alt={obra.title} className="w-full h-full object-cover" />
+              <img src={cfCapa(obra.coverUrl)} alt={obra.title} className="w-full h-full object-cover" />
             ) : (
               <div className="w-full h-full bg-secondary flex items-center justify-center">
                 <BookOpen className="w-8 h-8 text-primary/50" />
