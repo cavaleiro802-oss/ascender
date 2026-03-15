@@ -37,6 +37,46 @@ export async function uploadAvatar(file: File): Promise<UploadResult> {
   return res.json();
 }
 
+
+// ─── Compressão de imagem no browser (Canvas API) ────────────────────────────
+// Converte qualquer imagem para JPEG otimizado antes de enviar ao R2
+// Reduz ~943KB → ~150-250KB sem perda visual perceptível
+async function comprimirImagem(file: File, qualidade = 0.82, maxLargo = 1800): Promise<File> {
+  return new Promise((resolve) => {
+    const img = new Image();
+    const url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      let { width, height } = img;
+
+      // Redimensionar se muito grande (mantém proporção)
+      if (width > maxLargo) {
+        height = Math.round(height * (maxLargo / width));
+        width = maxLargo;
+      }
+
+      const canvas = document.createElement("canvas");
+      canvas.width  = width;
+      canvas.height = height;
+      const ctx = canvas.getContext("2d")!;
+      ctx.drawImage(img, 0, 0, width, height);
+
+      canvas.toBlob(
+        (blob) => {
+          if (!blob) { resolve(file); return; } // fallback sem compressão
+          // Só usar comprimida se for menor que o original
+          const comprimida = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+          resolve(comprimida.size < file.size ? comprimida : file);
+        },
+        "image/jpeg",
+        qualidade
+      );
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); resolve(file); };
+    img.src = url;
+  });
+}
+
 // ─── Upload de páginas via presigned URL (browser → R2 direto) ───────────────
 const PARALELO = 3; // conservador — evita throttle do R2
 const TIMEOUT_MS = 60_000; // 60s por imagem antes de desistir
@@ -57,6 +97,11 @@ export async function uploadPaginas(
   onProgress?: (atual: number, total: number) => void
 ): Promise<UploadResult[]> {
   // 1. Pedir presigned URLs — com tratamento de erro legível
+  // Comprimir imagens antes do upload (economiza ~70% de bandwidth)
+  const arquivosOtimizados = await Promise.all(
+    files.map((f) => comprimirImagem(f))
+  );
+
   let presignRes: Response;
   try {
     presignRes = await fetchComTimeout("/api/upload/presign", {
@@ -64,7 +109,7 @@ export async function uploadPaginas(
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        arquivos: files.map((f) => ({ tipo: f.type || "image/jpeg", tamanho: f.size })),
+        arquivos: arquivosOtimizados.map((f) => ({ tipo: f.type || "image/jpeg", tamanho: f.size })),
       }),
     }, 30_000);
   } catch (e: any) {
@@ -116,7 +161,8 @@ export async function uploadPaginas(
   for (let i = 0; i < files.length; i += PARALELO) {
     const lote = files.slice(i, i + PARALELO);
     const lotUrls = urls.slice(i, i + PARALELO);
-    await Promise.all(lote.map((file, j) => enviarUm(file, lotUrls[j].uploadUrl, lotUrls[j].publicUrl, lotUrls[j].key, i + j)));
+    const loteOtimizado = arquivosOtimizados.slice(i, i + PARALELO);
+    await Promise.all(loteOtimizado.map((file, j) => enviarUm(file, lotUrls[j].uploadUrl, lotUrls[j].publicUrl, lotUrls[j].key, i + j)));
   }
 
   return results;
