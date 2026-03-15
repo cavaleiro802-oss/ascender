@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { ChevronLeft, ChevronRight, ArrowLeft, AlignJustify, MousePointer } from "lucide-react";
+import { ChevronLeft, ChevronRight, ArrowLeft, AlignJustify, MousePointer, MessageCircle, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import AscenderLoader from "@/components/AscenderLoader";
+import { useAuth } from "@/hooks/useAuth";
 
 type Modo = "scroll" | "click";
 
@@ -15,6 +16,7 @@ export default function CapituloPage() {
   );
   const [paginaAtual, setPaginaAtual] = useState(0);
   const [cabecalhoVisivel, setCabecalhoVisivel] = useState(true);
+  const [textoComentario, setTextoComentario] = useState("");
   const [lastScroll, setLastScroll] = useState(0);
 
   const { data: capitulo, isLoading } = trpc.capitulos.byId.useQuery(
@@ -24,10 +26,27 @@ export default function CapituloPage() {
     { obraId: parseInt(obraId) }, { enabled: !!obraId }
   );
   const registrarView = trpc.capitulos.incrementViews.useMutation();
+  const { user, isAuthenticated } = useAuth();
+  const registrarHistorico = trpc.leitura.update.useMutation();
+  const hasRegisteredHistory = useRef(false);
 
   useEffect(() => {
-    if (capId) registrarView.mutate({ id: parseInt(capId) });
+    if (capId) {
+      registrarView.mutate({ id: parseInt(capId) });
+      hasRegisteredHistory.current = false;
+    }
   }, [capId]);
+
+  // [9] Registrar no histórico quando chegar ao fim (modo scroll = scroll para baixo; modo click = última página)
+  function registrarLeitura() {
+    if (!isAuthenticated || hasRegisteredHistory.current || !capId || !obraId) return;
+    hasRegisteredHistory.current = true;
+    registrarHistorico.mutate({
+      capituloId: parseInt(capId),
+      obraId: parseInt(obraId),
+      progresso: 100,
+    });
+  }
 
   const paginas: string[] = capitulo?.paginas ? JSON.parse(capitulo.paginas) : [];
   const isNovel = !!(capitulo as any)?.conteudo && paginas.length === 0;
@@ -46,6 +65,10 @@ export default function CapituloPage() {
       const curr = window.scrollY;
       setCabecalhoVisivel(curr < lastScroll || curr < 80);
       setLastScroll(curr);
+      // [9] Detectar fim da página
+      const scrollBottom = window.scrollY + window.innerHeight;
+      const pageHeight = document.documentElement.scrollHeight;
+      if (scrollBottom >= pageHeight - 200) registrarLeitura();
     };
     window.addEventListener("scroll", handler, { passive: true });
     return () => window.removeEventListener("scroll", handler);
@@ -141,10 +164,18 @@ export default function CapituloPage() {
             <img src={paginas[paginaAtual]} alt={`Página ${paginaAtual + 1}`}
               className="max-h-[calc(100vh-3rem)] max-w-full object-contain"
             />
+            {/* [6] Clicar na imagem só troca PÁGINA, nunca capítulo */}
             <button className="absolute left-0 top-0 w-1/3 h-full"
               onClick={() => setPaginaAtual((p) => Math.max(p - 1, 0))} />
             <button className="absolute right-0 top-0 w-1/3 h-full"
-              onClick={() => setPaginaAtual((p) => Math.min(p + 1, paginas.length - 1))} />
+              onClick={() => {
+                if (paginaAtual < paginas.length - 1) {
+                  setPaginaAtual((p) => p + 1);
+                } else {
+                  // [9] Chegou na última página — registrar histórico mas NÃO avançar capítulo automaticamente
+                  registrarLeitura();
+                }
+              }} />
 
             <div className="fixed bottom-6 left-0 right-0 flex justify-center pointer-events-none">
               <div className="flex items-center gap-3 bg-black/80 backdrop-blur rounded-full px-5 py-2.5 border border-white/10 pointer-events-auto">
@@ -167,7 +198,7 @@ export default function CapituloPage() {
         )}
 
         {/* Navegação entre capítulos */}
-        <div className="flex items-center gap-3 p-4 max-w-xl mx-auto mt-6 mb-16">
+        <div className="flex items-center gap-3 p-4 max-w-xl mx-auto mt-6 mb-6">
           <Button variant="outline" className="flex-1 border-border text-white/60 hover:text-white"
             disabled={!capAnterior} onClick={() => capAnterior && irCapitulo(capAnterior)}>
             <ChevronLeft className="w-4 h-4 mr-1" /> Cap. {capAnterior?.numero ?? "—"}
@@ -181,6 +212,103 @@ export default function CapituloPage() {
             Cap. {capProximo?.numero ?? "—"} <ChevronRight className="w-4 h-4 ml-1" />
           </Button>
         </div>
+
+        {/* [8] Comentários do capítulo */}
+        <ComentariosCapitulo
+          capituloId={parseInt(capId)}
+          obraId={parseInt(obraId)}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ─── Comentários do Capítulo ──────────────────────────────────────────────────
+function ComentariosCapitulo({ capituloId, obraId }: { capituloId: number; obraId: number }) {
+  const { user, isAuthenticated } = useAuth();
+  const utils = trpc.useUtils();
+  const [texto, setTexto] = useState("");
+  const [enviando, setEnviando] = useState(false);
+
+  const { data: comentarios = [], isLoading } = trpc.comentarios.listByCapitulo.useQuery(
+    { capituloId },
+    { enabled: !!capituloId }
+  );
+
+  const criar = trpc.comentarios.create.useMutation({
+    onSuccess: () => {
+      utils.comentarios.listByCapitulo.invalidate({ capituloId });
+      setTexto("");
+      setEnviando(false);
+    },
+    onError: (e) => { alert(e.message); setEnviando(false); },
+  });
+
+  function enviar() {
+    const t = texto.trim();
+    if (!t || !isAuthenticated) return;
+    setEnviando(true);
+    criar.mutate({ obraId, capituloId, content: t });
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto px-4 pb-16">
+      <div className="border-t border-white/10 pt-8">
+        <h3 className="text-white font-bold text-base mb-5 flex items-center gap-2">
+          <MessageCircle className="w-4 h-4 text-primary" />
+          Comentários ({comentarios.length})
+        </h3>
+
+        {/* Input de comentário */}
+        {isAuthenticated ? (
+          <div className="flex gap-2 mb-6">
+            <input
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && enviar()}
+              placeholder="Escreva um comentário..."
+              maxLength={500}
+              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-primary/50 transition-colors"
+            />
+            <button
+              onClick={enviar}
+              disabled={!texto.trim() || enviando}
+              className="bg-primary hover:bg-primary/90 disabled:opacity-40 text-white rounded-xl px-4 py-2.5 transition-colors flex-shrink-0"
+            >
+              {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            </button>
+          </div>
+        ) : (
+          <p className="text-white/30 text-sm mb-6 text-center py-4 border border-white/5 rounded-xl">
+            Faça login para comentar
+          </p>
+        )}
+
+        {/* Lista de comentários */}
+        {isLoading ? (
+          <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-white/30" /></div>
+        ) : comentarios.length === 0 ? (
+          <p className="text-white/20 text-sm text-center py-8">Nenhum comentário ainda. Seja o primeiro!</p>
+        ) : (
+          <div className="space-y-3">
+            {(comentarios as any[]).map((c) => (
+              <div key={c.id} className="flex gap-3">
+                <div className="w-8 h-8 rounded-full bg-primary/20 border border-primary/30 flex-shrink-0 flex items-center justify-center text-xs font-bold text-primary">
+                  {(c.autorId ?? "?").toString().slice(-2)}
+                </div>
+                <div className="flex-1 bg-white/5 rounded-xl px-4 py-2.5">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-xs font-bold text-white/70">#{c.autorId}</span>
+                    <span className="text-[10px] text-white/20">
+                      {new Date(c.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                  <p className="text-sm text-white/80 leading-relaxed">{c.content}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
