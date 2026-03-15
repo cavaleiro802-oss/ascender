@@ -149,7 +149,15 @@ export async function listObras(opts: { status?: string; genre?: string; search?
   query = query.where(and(...conditions));
   if (sort === "hot") query = query.orderBy(desc(obras.viewsWeek));
   else if (sort === "most") query = query.orderBy(desc(obras.viewsTotal));
-  else query = query.orderBy(desc(obras.updatedAt));
+  else {
+    // "recent": ordenar pelo último capítulo aprovado; obras sem cap ficam por updatedAt
+    query = query.orderBy(
+      desc(sql`COALESCE(
+        (SELECT MAX(c."createdAt") FROM capitulos c WHERE c."obraId" = ${obras.id} AND c.status = 'aprovado'),
+        ${obras.updatedAt}
+      )`)
+    );
+  }
   const obrasList = await query.limit(limit).offset((page - 1) * limit);
 
   // Buscar últimos 3 capítulos aprovados de cada obra
@@ -186,11 +194,6 @@ export async function listObras(opts: { status?: string; genre?: string; search?
     _ultimoCapAt: ultimoCapPorObra[o.id] ?? new Date(o.updatedAt),
   }));
 
-  // Para "recent": ordenar por data do último capítulo aprovado (obras sem caps ficam por updatedAt)
-  if (sort === "recent") {
-    obrasComCaps.sort((a, b) => b._ultimoCapAt.getTime() - a._ultimoCapAt.getTime());
-  }
-
   return obrasComCaps.map(({ _ultimoCapAt, ...o }) => o);
 }
 export async function listObrasByAuthor(authorId: number) {
@@ -202,7 +205,7 @@ export async function getObraById(id: number) {
   const result = await db.select().from(obras).where(eq(obras.id, id)).limit(1);
   return result[0];
 }
-export async function createObra(data: { title: string; synopsis?: string; genres?: string[]; coverUrl?: string; coverKey?: string; authorId: number; originalAuthor?: string; tipo?: "manga" | "novel" | "hq"; status: "em_espera" | "aprovada"; andamento?: "em_andamento" | "hiato" | "finalizado"; }) {
+export async function createObra(data: { title: string; synopsis?: string; genres?: string[]; coverUrl?: string; coverKey?: string; authorId: number; originalAuthor?: string; tipo?: "manga" | "novel"; status: "em_espera" | "aprovada"; andamento?: "em_andamento" | "hiato" | "finalizado"; }) {
   const db = await getDb(); if (!db) throw new Error("DB unavailable");
   const result = await db.insert(obras).values({ ...data, genres: data.genres ? JSON.stringify(data.genres) : null }).returning();
   return result[0];
@@ -659,4 +662,3 @@ export async function adicionarMoedas(userId: number, valor: number, descricao: 
   await db.update(users).set({ moedas: sql`${users.moedas} + ${valor}`, updatedAt: new Date() }).where(eq(users.id, userId));
   await db.insert(moedasTransacoes).values({ userId, valor, tipo: "recarga", descricao });
 }
-
