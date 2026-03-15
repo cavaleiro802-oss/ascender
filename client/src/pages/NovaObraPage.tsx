@@ -11,7 +11,7 @@ import { toast } from "sonner";
 import { ImagePlus, Loader2, Upload } from "lucide-react";
 
 // Tipos de mídia — ficam separados dos gêneros
-const TIPOS_MIDIA = ["Manga", "Manhwa", "Manhua", "Novel", "Light Novel", "Webtoon", "HQ", "Quadrinhos"];
+const TIPOS_MIDIA = ["Manga", "Manhwa", "Manhua", "Novel", "Light Novel", "Webtoon", "HQ", "Quadrinhos", "Hentai"];
 
 // Gêneros literários
 const GENRES = [
