@@ -202,7 +202,7 @@ export async function getObraById(id: number) {
   const result = await db.select().from(obras).where(eq(obras.id, id)).limit(1);
   return result[0];
 }
-export async function createObra(data: { title: string; synopsis?: string; genres?: string[]; coverUrl?: string; coverKey?: string; authorId: number; originalAuthor?: string; tipo?: "manga" | "novel"; status: "em_espera" | "aprovada"; andamento?: "em_andamento" | "hiato" | "finalizado"; }) {
+export async function createObra(data: { title: string; synopsis?: string; genres?: string[]; coverUrl?: string; coverKey?: string; authorId: number; originalAuthor?: string; tipo?: "manga" | "novel" | "hq"; status: "em_espera" | "aprovada"; andamento?: "em_andamento" | "hiato" | "finalizado"; }) {
   const db = await getDb(); if (!db) throw new Error("DB unavailable");
   const result = await db.insert(obras).values({ ...data, genres: data.genres ? JSON.stringify(data.genres) : null }).returning();
   return result[0];
@@ -659,3 +659,4 @@ export async function adicionarMoedas(userId: number, valor: number, descricao: 
   await db.update(users).set({ moedas: sql`${users.moedas} + ${valor}`, updatedAt: new Date() }).where(eq(users.id, userId));
   await db.insert(moedasTransacoes).values({ userId, valor, tipo: "recarga", descricao });
 }
+
