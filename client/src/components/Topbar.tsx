@@ -150,7 +150,7 @@ export default function Topbar() {
                       <Link href="/biblioteca" className="cursor-pointer"><Library className="w-4 h-4 mr-2" /> Minha Biblioteca</Link>
                     </DropdownMenuItem>
                     <DropdownMenuItem asChild>
-                      <Link href="/loja" className="cursor-pointer"><ShoppingBag className="w-4 h-4 mr-2 text-blue-400" /> Loja Ascender</Link>
+                      <Link href="/loja" className="cursor-pointer"><ShoppingBag className="w-4 h-4 mr-2 text-blue-400" /> Loja</Link>
                     </DropdownMenuItem>
                     {isUsuarioComum && (
                       <>
@@ -211,4 +211,3 @@ export default function Topbar() {
     </>
   );
 }
-
