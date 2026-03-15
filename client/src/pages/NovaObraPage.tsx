@@ -10,15 +10,22 @@ import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { ImagePlus, Loader2, Upload } from "lucide-react";
 
+// Tipos de mídia — ficam separados dos gêneros
+const TIPOS_MIDIA = ["Manga", "Manhwa", "Manhua", "Novel", "Light Novel", "Webtoon"];
+
+// Gêneros literários
 const GENRES = [
-  "Novel", "Manhwar", "Manga", "Ação", "Aventura", "Comédia", "Drama", "Fantasia",
-  "Horror", "Mistério", "Romance", "Sci-Fi", "Slice of Life", "Culinaria",
+  "Ação", "Aventura", "Comédia", "Drama", "Fantasia", "Horror",
+  "Mistério", "Romance", "Sci-Fi", "Slice of Life", "Culinária",
   "Supernatural", "Esportes", "Histórico", "Psicológico", "Ecchi",
+  "Isekai", "Shounen", "Shoujo", "Seinen", "Josei", "Yaoi", "Yuri",
+  "Mahou Shoujo", "Mecha", "Policial", "Corrida", "Artes Marciais",
+  "Reencarnação", "Sistema", "Harem", "Vilã", "Dungeons",
 ];
 
 const ANDAMENTO_OPTIONS = [
   { value: "em_andamento", label: "▶ Em Andamento", cls: "border-green-500/50 text-green-400 bg-green-500/10" },
-  { value: "iato",         label: "⏸ Iato",         cls: "border-yellow-500/50 text-yellow-400 bg-yellow-500/10" },
+  { value: "hiato",        label: "⏸ Hiato",        cls: "border-yellow-500/50 text-yellow-400 bg-yellow-500/10" },
   { value: "finalizado",   label: "✓ Finalizado",   cls: "border-blue-500/50 text-blue-400 bg-blue-500/10" },
 ];
 
@@ -30,7 +37,7 @@ export default function NovaObraPage() {
   const [synopsis, setSynopsis] = useState("");
   const [originalAuthor, setOriginalAuthor] = useState("");
   const [selectedGenres, setSelectedGenres] = useState<string[]>([]);
-  const [andamento, setAndamento] = useState<"em_andamento" | "iato" | "finalizado">("em_andamento");
+  const [andamento, setAndamento] = useState<"em_andamento" | "hiato" | "finalizado">("em_andamento");
   const [tipo, setTipo] = useState<"manga" | "novel">("manga");
   const [coverPreview, setCoverPreview] = useState<string | null>(null);
   const [coverFile, setCoverFile] = useState<File | null>(null);
@@ -226,11 +233,32 @@ export default function NovaObraPage() {
             </div>
           </div>
 
-          {/* Gêneros */}
+          {/* Tipo de Mídia + Gêneros */}
           <div>
             <Label className="text-white/80 mb-1.5 block">
               Gêneros * <span className="text-muted-foreground font-normal">(máx. 5)</span>
             </Label>
+
+            {/* Linha 1: Tipos de mídia */}
+            <p className="text-xs text-white/40 uppercase tracking-wider mb-1.5 mt-1">Tipo de Mídia</p>
+            <div className="flex flex-wrap gap-2 mb-4">
+              {TIPOS_MIDIA.map((g) => (
+                <button key={g} onClick={() => toggleGenre(g)}
+                  className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
+                    selectedGenres.includes(g)
+                      ? "bg-purple-600 border-purple-500 text-white"
+                      : "bg-transparent border-purple-800/50 text-purple-300/60 hover:border-purple-500/60 hover:text-purple-200"
+                  }`}>
+                  {g}
+                </button>
+              ))}
+            </div>
+
+            {/* Divisor */}
+            <div className="border-t border-border/50 my-2" />
+
+            {/* Linha 2: Gêneros */}
+            <p className="text-xs text-white/40 uppercase tracking-wider mb-1.5 mt-3">Gêneros</p>
             <div className="flex flex-wrap gap-2">
               {GENRES.map((g) => (
                 <button key={g} onClick={() => toggleGenre(g)}
