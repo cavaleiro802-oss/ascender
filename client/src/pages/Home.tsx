@@ -13,14 +13,9 @@ import {
 } from "lucide-react";
 import { useDebounce } from "@/hooks/useDebounce";
 
-const TIPOS_MIDIA = ["Manga", "Manhwa", "Manhua", "Novel", "Light Novel", "Webtoon", "HQ", "Hentai"];
 const GENRES = [
-  "Ação", "Aventura", "Comédia", "Drama", "Fantasia", "Horror",
-  "Mistério", "Romance", "Sci-Fi", "Slice of Life", "Culinária",
-  "Supernatural", "Esportes", "Histórico", "Psicológico", "Ecchi",
-  "Isekai", "Shounen", "Shoujo", "Seinen", "Josei", "Yaoi", "Yuri",
-  "Mahou Shoujo", "Mecha", "Policial", "Artes Marciais", "Reencarnação",
-  "Sistema", "Harem", "Vilã", "Dungeons",
+  "Novel", "Manhwar", "Ação", "Aventura", "Comédia", "Drama", "Fantasia",
+  "Mangá", "Horror", "Mistério", "Romance", "Sci-Fi", "Slice of Life", "Culinaria",
 ];
 
 const CAROUSEL_SIZE = 20;
@@ -132,7 +127,27 @@ function PropagandaBanner({ onClose, onAction }: { onClose: () => void; onAction
               >
                 {p.btnLabel}
               </Button>
-
+              {/* Menu 3 pontos */}
+              <div className="relative group/menu">
+                <button className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 flex items-center justify-center transition-colors">
+                  <span className="text-white/70 font-bold text-xs leading-none">•••</span>
+                </button>
+                <div className="absolute right-0 top-9 bg-black/95 border border-white/10 rounded-xl shadow-2xl w-44 py-1.5 hidden group-hover/menu:block z-50">
+                  <button onClick={() => navigate("/loja")}
+                    className="w-full text-left px-4 py-2 text-sm text-white/80 hover:text-white hover:bg-white/5 flex items-center gap-2 transition-colors">
+                    🛍️ Ver Loja
+                  </button>
+                  <button onClick={() => onAction?.("pedido_cargo")}
+                    className="w-full text-left px-4 py-2 text-sm text-white/80 hover:text-white hover:bg-white/5 flex items-center gap-2 transition-colors">
+                    ⚔️ Ser Tradutor
+                  </button>
+                  <div className="border-t border-white/5 my-1" />
+                  <button onClick={() => navigate("/")}
+                    className="w-full text-left px-4 py-2 text-sm text-white/50 hover:text-white hover:bg-white/5 flex items-center gap-2 transition-colors">
+                    📖 Como funciona
+                  </button>
+                </div>
+              </div>
             </div>
             {PROPAGANDAS.length > 1 && (
               <div className="flex gap-1.5">
@@ -209,7 +224,7 @@ function HeroBanner({ obras, onObraClick }: { obras: any[]; onObraClick: (id: nu
           </div>
           <Button
             className="bg-white/10 hover:bg-primary border border-white/20 hover:border-primary text-white font-bold gap-2.5 backdrop-blur-sm transition-all duration-300 shadow-lg px-6 py-5 text-sm"
-            onClick={() => onObraClick(obra.id)}
+            onClick={() => onObraClick(obra)}
           >
             <Play className="w-4 h-4 fill-white" />
             LER AGORA
@@ -281,7 +296,7 @@ function ObraCard({ obra, onClick }: { obra: any; onClick: () => void }) {
             {caps.slice(0, 3).map((cap: any) => (
               <div key={cap.id}
                 className="flex items-center justify-between text-[10px] hover:bg-white/5 rounded px-1 -mx-1 transition-colors cursor-pointer"
-                onClick={(e) => { e.stopPropagation(); navigate(`/obra/${obra.id}/capitulo/${cap.id}`); }}>
+                onClick={(e) => { e.stopPropagation(); navigate(`/obra/${obra.slug}/capitulo/${cap.numero}`); }}>
                 <span className="text-white/60 truncate">Cap. {cap.numero}</span>
                 {isNovo(cap.createdAt) ? (
                   <span className="bg-primary text-white text-[9px] font-black px-1.5 py-0.5 rounded flex-shrink-0">NOVO</span>
@@ -306,7 +321,7 @@ function Carrossel({ obras, titulo, icone, onObraClick }: {
   obras: any[];
   titulo: string;
   icone: React.ReactNode;
-  onObraClick: (id: number) => void;
+  onObraClick: (obra: any) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const SCROLL_AMOUNT = 340;
@@ -339,7 +354,7 @@ function Carrossel({ obras, titulo, icone, onObraClick }: {
         >
           {obras.map((obra) => (
             <div key={obra.id} className="flex-shrink-0 w-36 sm:w-40 lg:w-44">
-              <ObraCard obra={obra} onClick={() => onObraClick(obra.id)} />
+              <ObraCard obra={obra} onClick={() => onObraClick(obra)} />
             </div>
           ))}
         </div>
@@ -391,7 +406,7 @@ export default function Home() {
   const visibleRecent = recentObras.slice(0, recentLimit);
   const hasMore = recentObras.length > recentLimit;
 
-  function goObra(id: number) { navigate(`/obra/${id}`); }
+  function goObra(slug: string) { navigate(`/obra/${slug}`); }
 
   function loadMore() {
     setLoadingMore(true);
@@ -422,43 +437,22 @@ export default function Home() {
           )}
         </div>
 
-        {/* Filtros — aparecem ao digitar */}
+        {/* Filtros de gênero — só aparecem ao buscar */}
         {buscando && (
-          <div className="space-y-2">
-            {/* Tipos de mídia */}
-            <div className="overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-              <div className="flex gap-2 w-max pb-1">
-                <span className="text-[10px] text-white/30 uppercase tracking-wider self-center flex-shrink-0">Tipo</span>
-                {TIPOS_MIDIA.map((g) => (
-                  <button key={g}
-                    onClick={() => { setGenre(genre === g ? undefined : g); setRecentLimit(INITIAL_RECENT); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all whitespace-nowrap flex-shrink-0 ${
-                      genre === g
-                        ? "bg-purple-600 border-purple-500 text-white"
-                        : "bg-white/5 border-purple-800/30 text-purple-300/60 hover:border-purple-500/50 hover:text-purple-200"
-                    }`}>
-                    {g}
-                  </button>
-                ))}
-              </div>
-            </div>
-            {/* Gêneros */}
-            <div className="overflow-x-auto" style={{ scrollbarWidth: "none" }}>
-              <div className="flex gap-2 w-max pb-1">
-                <span className="text-[10px] text-white/30 uppercase tracking-wider self-center flex-shrink-0">Gênero</span>
-                {GENRES.map((g) => (
-                  <button key={g}
-                    onClick={() => { setGenre(genre === g ? undefined : g); setRecentLimit(INITIAL_RECENT); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all whitespace-nowrap flex-shrink-0 ${
-                      genre === g
-                        ? "bg-primary border-primary text-white"
-                        : "bg-white/5 border-border text-white/50 hover:border-white/40 hover:text-white"
-                    }`}>
-                    {g}
-                  </button>
-                ))}
-              </div>
-            </div>
+          <div className="flex gap-2 flex-wrap">
+            {GENRES.map((g) => (
+              <button
+                key={g}
+                onClick={() => { setGenre(genre === g ? undefined : g); setRecentLimit(INITIAL_RECENT); }}
+                className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
+                  genre === g
+                    ? "bg-primary border-primary text-white"
+                    : "bg-transparent border-border text-white/60 hover:border-white/40 hover:text-white"
+                }`}
+              >
+                {g}
+              </button>
+            ))}
           </div>
         )}
 
@@ -466,7 +460,7 @@ export default function Home() {
         {!buscando && (
           <>
             {/* Hero */}
-            {hotObras.length > 0 && <HeroBanner obras={hotObras.slice(0, 6)} onObraClick={goObra} />}
+            {hotObras.length > 0 && <HeroBanner obras={hotObras.slice(0, 6)} onObraClick={(obra: any) => goObra(obra.slug ?? String(obra.id))} />}
 
             {/* Carrosséis */}
             {isTranslator && minhasObras.length > 0 && (
@@ -474,11 +468,11 @@ export default function Home() {
                 obras={minhasObras}
                 titulo="Minhas Obras"
                 icone={<BookOpen className="w-5 h-5 text-purple-400" />}
-                onObraClick={goObra}
+                onObraClick={(obra: any) => goObra(obra.slug ?? String(obra.id))}
               />
             )}
-            <Carrossel obras={hotObras} titulo="Em Alta" icone={<Flame className="w-5 h-5 text-orange-400" />} onObraClick={goObra} />
-            <Carrossel obras={mostObras} titulo="Mais Lidos" icone={<Eye className="w-5 h-5 text-blue-400" />} onObraClick={goObra} />
+            <Carrossel obras={hotObras} titulo="Em Alta" icone={<Flame className="w-5 h-5 text-orange-400" />} onObraClick={(obra: any) => goObra(obra.slug ?? String(obra.id))} />
+            <Carrossel obras={mostObras} titulo="Mais Lidos" icone={<Eye className="w-5 h-5 text-blue-400" />} onObraClick={(obra: any) => goObra(obra.slug ?? String(obra.id))} />
 
             {/* Banner ASCENDER — só no painel central, abaixo dos carrosséis */}
             {showBanner && <PropagandaBanner onClose={closeBanner} onAction={(acao) => { if (acao === "pedido_cargo") setShowPedidoModal(true); }} />}
@@ -515,7 +509,7 @@ export default function Home() {
             <>
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 2xl:grid-cols-7 gap-3 sm:gap-4">
                 {visibleRecent.map((obra) => (
-                  <ObraCard key={obra.id} obra={obra} onClick={() => goObra(obra.id)} />
+                  <ObraCard key={obra.id} obra={obra} onClick={() => goObra(obra.slug ?? String(obra.id))} />
                 ))}
               </div>
               {hasMore && (
