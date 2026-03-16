@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 
 export interface UploadResult {
@@ -64,11 +65,10 @@ async function comprimirImagem(file: File, qualidade = 0.82, maxLargo = 1800): P
       canvas.toBlob(
         (blob) => {
           if (!blob) { resolve(file); return; } // fallback sem compressão
-          // Só usar comprimida se for menor que o original
-          const comprimida = new File([blob], file.name.replace(/\.[^.]+$/, ".jpg"), { type: "image/jpeg" });
+          const comprimida = new File([blob], file.name.replace(/\.[^.]+$/, ".webp"), { type: "image/webp" });
           resolve(comprimida.size < file.size ? comprimida : file);
         },
-        "image/jpeg",
+        "image/webp",
         qualidade
       );
     };
@@ -190,14 +190,14 @@ export function useUpload() {
     }
   }
 
-  async function uploadCapitulo(files: File[]): Promise<UploadResult[] | null> {
+  async function uploadCapitulo(files: File[], contexto?: { obraId: number; numero: number }): Promise<UploadResult[] | null> {
     setUploading(true);
     setProgress(0);
     setError(null);
     try {
       return await uploadPaginas(files, (atual, total) => {
         setProgress(Math.round((atual / total) * 100));
-      });
+      }, contexto);
     } catch (e: any) {
       setError(e.message);
       return null;
