@@ -97,7 +97,7 @@ function Comentario({
 }
 
 export default function ObraPage() {
-  const { id } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const obraId = parseInt(id ?? "0");
   const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
@@ -124,7 +124,7 @@ export default function ObraPage() {
   const isSupreme = user?.role === "admin_supremo";
   const isTranslator = ["tradutor_aprendiz","tradutor_oficial","admin_senhor","admin_supremo"].includes(user?.role ?? "");
 
-  const { data: obra, isLoading } = trpc.obras.byId.useQuery({ id: obraId });
+  const { data: obra, isLoading } = trpc.obras.bySlug.useQuery({ slug: slug ?? "" });
   const { data: capitulos = [] } = trpc.capitulos.list.useQuery({ obraId, includeAll: isTranslator });
   const { data: comentarios = [] } = trpc.comentarios.list.useQuery({ obraId });
   const { data: curtidaCount = 0 } = trpc.curtidas.count.useQuery({ obraId });
@@ -344,7 +344,7 @@ export default function ObraPage() {
         <div className="flex gap-3 mb-6">
           {capitulos.length > 0 && (
             <Button className="flex-1 bg-white/10 hover:bg-primary border border-white/20 hover:border-primary text-white font-bold gap-2 transition-all"
-              onClick={() => navigate(`/obra/${obraId}/capitulo/${capitulos[0].id}`)}>
+              onClick={() => navigate(`/obra/${obra?.slug}/capitulo/${capitulos[0].numero}`)}>
               <BookOpen className="w-4 h-4" /> Começar a Ler
             </Button>
           )}
@@ -480,7 +480,7 @@ export default function ObraPage() {
             {isOwnerOrAdmin && (
               <div className="flex justify-end mb-3">
                 <Button size="sm" className="bg-primary hover:bg-primary/90 text-white text-xs"
-                  onClick={() => navigate(`/obra/${obraId}/novo-capitulo`)}>
+                  onClick={() => navigate(`/obra/${obra?.slug}/novo-capitulo`)}>
                   + Novo Capítulo
                 </Button>
               </div>
@@ -492,7 +492,7 @@ export default function ObraPage() {
                 {capsPage.map((cap: any) => (
                   <div key={cap.id}
                     className="flex items-center justify-between px-3 py-3 rounded-lg hover:bg-white/5 cursor-pointer transition-colors group border border-transparent hover:border-border/50"
-                    onClick={() => navigate(`/obra/${obraId}/capitulo/${cap.id}`)}>
+                    onClick={() => navigate(`/obra/${obra?.slug}/capitulo/${cap.numero}`)}>
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       {editandoNumCap === cap.id ? (
                         <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
