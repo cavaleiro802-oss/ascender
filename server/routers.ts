@@ -8,7 +8,7 @@ import {
   countNotificacoesNaoLidas, createCapitulo, createComentario, createObra,
   createReport, criarNotificacao, criarPedidoCargo, deletarSessao, deleteComentario,
   deleteCapitulo, getCapituloById, getComentarioById, getCurtida, getFavorito, getHistoricoLeitura, updateCapituloNumero,
-  getObraById, getPublicLink, getPlatformStats, getUserById, getUserByOpenId,
+  getObraById, getObraBySlug, getCapituloByObraAndNumero, gerarSlug, getPublicLink, getPlatformStats, getUserById, getUserByOpenId,
   incrementCapituloViews, incrementObraViews, listCapitulos, listComentarios, listComentariosByCapitulo,
   listFavoritos, listHistoricoAdm, listNotificacoes, listObras, listObrasByAuthor,
   listPedidosCargo, listPendingCapitulos, listPendingObras, listReports, listUsers,
@@ -155,6 +155,19 @@ const obrasRouter = router({
     return listObrasByAuthor(ctx.user.id);
   }),
 
+  bySlug: publicProcedure
+    .input(z.object({ slug: z.string() }))
+    .query(async ({ ctx, input }) => {
+      const obra = await getObraBySlug(input.slug);
+      if (!obra) throw new TRPCError({ code: "NOT_FOUND" });
+      if (obra.status !== "aprovada") {
+        const isAuthor    = ctx.user?.id === obra.authorId;
+        const isAdminUser = ctx.user && isAdmin(ctx.user.role);
+        if (!isAuthor && !isAdminUser) throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      return obra;
+    }),
+
   byTranslatorId: protectedProcedure
     .input(z.object({ translatorId: z.number() }))
     .query(({ ctx, input }) => {
@@ -182,6 +195,21 @@ const capitulosRouter = router({
     }
     return cap;
   }),
+
+  bySlugAndNumero: publicProcedure
+    .input(z.object({ slug: z.string(), numero: z.number() }))
+    .query(async ({ ctx, input }) => {
+      const obra = await getObraBySlug(input.slug);
+      if (!obra) throw new TRPCError({ code: "NOT_FOUND" });
+      const cap = await getCapituloByObraAndNumero(obra.id, input.numero);
+      if (!cap) throw new TRPCError({ code: "NOT_FOUND" });
+      if (cap.status !== "aprovado") {
+        const isAuthor    = ctx.user?.id === cap.authorId;
+        const isAdminUser = ctx.user && isAdmin(ctx.user.role);
+        if (!isAuthor && !isAdminUser) throw new TRPCError({ code: "NOT_FOUND" });
+      }
+      return { ...cap, obraSlug: obra.slug };
+    }),
 
   create: protectedProcedure
     .input(z.object({
