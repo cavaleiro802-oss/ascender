@@ -115,8 +115,10 @@ uploadRouter.post("/presign", async (req, res) => {
     const rl = checkRateLimit({ key: `upload:${user.id}`, ...LIMITS.upload });
     if (!rl.allowed) return res.status(429).json({ error: `Muitos uploads. Tente em ${rl.retryAfterSec}s.` });
 
-    const { arquivos } = req.body as {
+    const { arquivos, obraId, numeroCapitulo } = req.body as {
       arquivos: Array<{ tipo: string; tamanho: number }>;
+      obraId?: number;
+      numeroCapitulo?: number;
     };
 
     if (!Array.isArray(arquivos) || arquivos.length === 0) {
@@ -127,8 +129,10 @@ uploadRouter.post("/presign", async (req, res) => {
     }
 
     // Valida cada arquivo antes de gerar URLs
+    // Aceita também image/webp gerado pelo canvas do browser
+    const TIPOS_ACEITOS = [...ALLOWED_TYPES, "image/webp"];
     for (const a of arquivos) {
-      if (!ALLOWED_TYPES.includes(a.tipo)) {
+      if (!TIPOS_ACEITOS.includes(a.tipo)) {
         return res.status(400).json({ error: `Tipo não permitido: ${a.tipo}. Use JPG, PNG ou WebP.` });
       }
       if (a.tamanho > MAX_SIZE) {
@@ -136,11 +140,18 @@ uploadRouter.post("/presign", async (req, res) => {
       }
     }
 
-    // Gera uma presigned URL por imagem (PUT direto no R2, expira em 10 min)
+    // Gera uma presigned URL por imagem com path organizado
+    // Estrutura: obras/obraId/cap-numero/001.webp
+    const pasta = obraId && numeroCapitulo !== undefined
+      ? `obras/${obraId}/cap-${numeroCapitulo}`
+      : `paginas`; // fallback para uploads sem contexto
+
     const urls = await Promise.all(
-      arquivos.map(async (a) => {
-        const ext = a.tipo.split("/")[1].replace("jpeg", "jpg");
-        const key = `paginas/${uuid()}.${ext}`;
+      arquivos.map(async (a, idx) => {
+        // Sempre salvar como webp (browser já converteu)
+        const ext = a.tipo === "image/webp" ? "webp" : a.tipo.split("/")[1].replace("jpeg", "jpg");
+        const pagNum = String(idx + 1).padStart(3, "0"); // 001, 002, 003...
+        const key = `${pasta}/${pagNum}.${ext}`;
         const command = new PutObjectCommand({
           Bucket: BUCKET,
           Key: key,
@@ -160,3 +171,4 @@ uploadRouter.post("/presign", async (req, res) => {
 });
 
 export default uploadRouter;
+
