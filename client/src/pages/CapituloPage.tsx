@@ -10,7 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 type Modo = "scroll" | "click";
 
 export default function CapituloPage() {
-  const { obraId, capId } = useParams<{ obraId: string; capId: string }>();
+  const { slug, numero } = useParams<{ slug: string; numero: string }>();
   const [, navigate] = useLocation();
   const [modo, setModo] = useState<Modo>(() =>
     (localStorage.getItem("asc_leitor_modo") as Modo) ?? "scroll"
@@ -20,11 +20,13 @@ export default function CapituloPage() {
   const [textoComentario, setTextoComentario] = useState("");
   const [lastScroll, setLastScroll] = useState(0);
 
-  const { data: capitulo, isLoading } = trpc.capitulos.byId.useQuery(
-    { id: parseInt(capId) }, { enabled: !!capId }
+  const { data: capitulo, isLoading } = trpc.capitulos.bySlugAndNumero.useQuery(
+    { slug: slug ?? "", numero: parseFloat(numero ?? "0") }, { enabled: !!slug && !!numero }
   );
+  const obraId = capitulo?.obraId;
+  const capId  = capitulo?.id;
   const { data: todosCapitulos = [] } = trpc.capitulos.list.useQuery(
-    { obraId: parseInt(obraId) }, { enabled: !!obraId }
+    { obraId: obraId ?? 0 }, { enabled: !!obraId }
   );
   const registrarView = trpc.capitulos.incrementViews.useMutation();
   const { user, isAuthenticated } = useAuth();
@@ -33,18 +35,18 @@ export default function CapituloPage() {
 
   useEffect(() => {
     if (capId) {
-      registrarView.mutate({ id: parseInt(capId) });
+      registrarView.mutate({ id: capId });
       hasRegisteredHistory.current = false;
     }
-  }, [capId]);
+  }, [slug, numero]);
 
   // [9] Registrar no histórico quando chegar ao fim (modo scroll = scroll para baixo; modo click = última página)
   function registrarLeitura() {
     if (!isAuthenticated || hasRegisteredHistory.current || !capId || !obraId) return;
     hasRegisteredHistory.current = true;
     registrarHistorico.mutate({
-      capituloId: parseInt(capId),
-      obraId: parseInt(obraId),
+      capituloId: capId ?? 0,
+      obraId: obraId ?? 0,
       progresso: 100,
     });
   }
@@ -94,7 +96,7 @@ export default function CapituloPage() {
   }
 
   function irCapitulo(cap: any) {
-    navigate(`/obra/${obraId}/capitulo/${cap.id}`);
+    navigate(`/obra/${slug}/capitulo/${cap.numero}`);
     setPaginaAtual(0);
     window.scrollTo(0, 0);
   }
@@ -113,7 +115,7 @@ export default function CapituloPage() {
       <header className={`fixed top-0 left-0 right-0 z-50 bg-black/95 backdrop-blur border-b border-white/10 transition-transform duration-300 ${cabecalhoVisivel ? "translate-y-0" : "-translate-y-full"}`}>
         <div className="container flex items-center gap-3 h-12">
           <Button size="icon" variant="ghost" className="text-white/60 hover:text-white shrink-0"
-            onClick={() => navigate(`/obra/${obraId}`)}>
+            onClick={() => navigate(`/obra/${slug}`)}>
             <ArrowLeft className="w-5 h-5" />
           </Button>
           <p className="flex-1 text-sm text-white/70 truncate font-medium">
@@ -205,7 +207,7 @@ export default function CapituloPage() {
             <ChevronLeft className="w-4 h-4 mr-1" /> Cap. {capAnterior?.numero ?? "—"}
           </Button>
           <Button variant="outline" className="border-border text-white/60 hover:text-white px-4"
-            onClick={() => navigate(`/obra/${obraId}`)}>
+            onClick={() => navigate(`/obra/${slug}`)}>
             Voltar
           </Button>
           <Button variant="outline" className="flex-1 border-border text-white/60 hover:text-white"
