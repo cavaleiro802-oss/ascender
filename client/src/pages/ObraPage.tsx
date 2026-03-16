@@ -124,6 +124,7 @@ export default function ObraPage() {
   const isTranslator = ["tradutor_aprendiz","tradutor_oficial","admin_senhor","admin_supremo"].includes(user?.role ?? "");
 
   const { data: obra, isLoading } = trpc.obras.bySlug.useQuery({ slug: slug ?? "" });
+  const obraId = obra?.id ?? 0;
   const { data: capitulos = [] } = trpc.capitulos.list.useQuery({ obraId, includeAll: isTranslator });
   const { data: comentarios = [] } = trpc.comentarios.list.useQuery({ obraId });
   const { data: curtidaCount = 0 } = trpc.curtidas.count.useQuery({ obraId });
