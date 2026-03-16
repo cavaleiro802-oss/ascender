@@ -58,7 +58,7 @@ export default function CapituloPage() {
   const capsVisiveis = (todosCapitulos as any[])
     .filter((c) => c.status === "aprovado" || c.status === "aguardando")
     .sort((a, b) => a.numero - b.numero);
-  const idx = capsVisiveis.findIndex((c) => c.id === parseInt(capId));
+  const idx = capsVisiveis.findIndex((c) => c.id === capId);
   const capAnterior = capsVisiveis[idx - 1];
   const capProximo = capsVisiveis[idx + 1];
 
