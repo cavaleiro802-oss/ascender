@@ -221,38 +221,7 @@ export default function PerfilPage() {
           )}
         </div>
 
-        {/* Comprar moedas */}
-        <div className="asc-card p-5">
-          <h2 className="text-base font-black text-white mb-4 flex items-center gap-2">
-            <span className="text-yellow-400">🪙</span> Comprar Moedas
-          </h2>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {[
-              { moedas: 100,  preco: "R$ 5,00",  bonus: "" },
-              { moedas: 250,  preco: "R$ 10,00", bonus: "+25 bônus" },
-              { moedas: 600,  preco: "R$ 20,00", bonus: "+100 bônus" },
-              { moedas: 1400, preco: "R$ 40,00", bonus: "+400 bônus" },
-              { moedas: 3000, preco: "R$ 75,00", bonus: "+1000 bônus" },
-              { moedas: 7000, preco: "R$150,00", bonus: "+3000 bônus" },
-            ].map((pkg) => (
-              <div key={pkg.moedas} className="rounded-xl border border-yellow-500/20 bg-yellow-500/5 p-3 flex flex-col gap-2">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-yellow-400 text-lg">🪙</span>
-                  <span className="text-white font-black text-lg">{pkg.moedas.toLocaleString()}</span>
-                </div>
-                {pkg.bonus && (
-                  <span className="text-[10px] text-green-400 font-bold">{pkg.bonus}</span>
-                )}
-                <button
-                  onClick={() => toast.info("Pagamentos em breve! 🚀")}
-                  className="w-full py-2 rounded-lg bg-yellow-500/20 hover:bg-yellow-500/30 border border-yellow-500/30 text-yellow-400 text-xs font-black transition-colors">
-                  {pkg.preco}
-                </button>
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-white/20 text-center mt-4">Pagamentos via Pix e cartão — em breve!</p>
-        </div>
+
 
       </main>
     </div>
