@@ -143,7 +143,7 @@ function FavCard({ obraId }: { obraId: number }) {
 
   return (
     <div
-      onClick={() => navigate(`/obra/${obraId}`)}
+      onClick={() => navigate(`/obra/${obra?.slug ?? obraId}`)}
       className="asc-card overflow-hidden cursor-pointer group transition-all duration-200 hover:border-primary/40 hover:-translate-y-1 hover:shadow-xl hover:shadow-primary/10"
     >
       <div className="relative aspect-[3/4] bg-secondary overflow-hidden">
@@ -177,7 +177,7 @@ function FavCard({ obraId }: { obraId: number }) {
             {caps.slice(0, 3).map((cap: any) => (
               <div key={cap.id}
                 className="flex items-center justify-between text-[10px] hover:bg-white/5 rounded px-1 -mx-1 transition-colors"
-                onClick={(e) => { e.stopPropagation(); navigate(`/obra/${obraId}/capitulo/${cap.id}`); }}>
+                onClick={(e) => { e.stopPropagation(); navigate(`/obra/${obra?.slug ?? obraId}/capitulo/${cap.numero}`); }}>
                 <span className="text-white/60 truncate">Cap. {cap.numero}</span>
                 <span className="text-white/30 flex-shrink-0">
                   {new Date(cap.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
@@ -203,7 +203,7 @@ function HistoricoCard({ entry }: { entry: any }) {
   return (
     <div
       className="asc-tile p-3 flex gap-3 items-center cursor-pointer"
-      onClick={() => navigate(`/obra/${entry.obraId}/capitulo/${entry.capituloId}`)}
+      onClick={() => navigate(`/obra/${obra?.slug ?? entry.obraId}/capitulo/${cap?.numero ?? entry.capituloId}`)}
     >
       <div className="w-10 h-14 flex-shrink-0 rounded-lg overflow-hidden bg-secondary border border-border">
         {obra.coverUrl
