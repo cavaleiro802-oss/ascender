@@ -98,8 +98,7 @@ function Comentario({
 
 export default function ObraPage() {
   const { slug } = useParams<{ slug: string }>();
-  const obraId = parseInt(id ?? "0");
-  const { user, isAuthenticated } = useAuth();
+    const { user, isAuthenticated } = useAuth();
   const [, navigate] = useLocation();
   const utils = trpc.useUtils();
   const coverFileRef = useRef<HTMLInputElement>(null);
@@ -145,11 +144,11 @@ export default function ObraPage() {
     onSuccess: () => utils.comentarios.list.invalidate({ obraId }),
   });
   const updateObra = trpc.obras.update.useMutation({
-    onSuccess: () => { utils.obras.byId.invalidate({ id: obraId }); setEditando(false); toast.success("Obra atualizada!"); },
+    onSuccess: () => { utils.obras.bySlug.invalidate({ slug: slug ?? "" }); setEditando(false); toast.success("Obra atualizada!"); },
     onError: (e) => toast.error(e.message),
   });
 
-  useEffect(() => { if (obraId) incrementViews.mutate({ id: obraId }); }, [obraId]);
+  useEffect(() => { if (obra?.id) incrementViews.mutate({ id: obra.id }); }, [obra?.id]);
 
   const updateNumCap = trpc.capitulos.updateNumero.useMutation({
     onSuccess: () => {
