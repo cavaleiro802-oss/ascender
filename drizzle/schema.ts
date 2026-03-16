@@ -51,6 +51,7 @@ export type InsertUser = typeof users.$inferInsert;
 export const obras = pgTable("obras", {
   id:             integer("id").primaryKey().generatedAlwaysAsIdentity(),
   title:          varchar("title",          { length: 255 }).notNull(),
+  slug:           varchar("slug",           { length: 300 }).unique(),
   synopsis:       text("synopsis"),
   genres:         text("genres"),
   coverUrl:       text("coverUrl"),
