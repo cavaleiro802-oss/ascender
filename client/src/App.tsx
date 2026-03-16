@@ -19,9 +19,9 @@ export default function App() {
       <Switch>
         <Route path="/" component={Home} />
         <Route path="/login" component={LoginPage} />
-        <Route path="/obra/:id/novo-capitulo" component={NovoCapituloPage} />
-        <Route path="/obra/:obraId/capitulo/:capId" component={CapituloPage} />
-        <Route path="/obra/:id" component={ObraPage} />
+        <Route path="/obra/:slug/novo-capitulo" component={NovoCapituloPage} />
+        <Route path="/obra/:slug/capitulo/:numero" component={CapituloPage} />
+        <Route path="/obra/:slug" component={ObraPage} />
         <Route path="/nova-obra" component={NovaObraPage} />
         <Route path="/biblioteca" component={BibliotecaPage} />
         <Route path="/admin" component={AdminPage} />
