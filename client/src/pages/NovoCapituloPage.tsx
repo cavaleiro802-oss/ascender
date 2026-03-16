@@ -167,7 +167,7 @@ function AbaUnico({ obraId }: { obraId: string }) {
   async function handleSubmit() {
     if (!numero || isNaN(parseFloat(numero))) return toast.error("Número do capítulo obrigatório.");
     if (arquivos.length === 0) return toast.error("Adicione pelo menos 1 página.");
-    const resultados = await uploadCapitulo(arquivos);
+    const resultados = await uploadCapitulo(arquivos, { obraId: parseInt(obraId), numero: parseFloat(numero) });
     if (!resultados) return;
     await criar.mutateAsync({
       obraId: parseInt(obraId),
@@ -330,7 +330,7 @@ function AbaLote({ obraId }: { obraId: string }) {
     async function enviarCap(cap: CapLote, i: number) {
       setCaps((prev) => prev.map((c, idx) => idx === i ? { ...c, status: "enviando" } : c));
       try {
-        const resultados = await uploadCapitulo(cap.arquivos);
+        const resultados = await uploadCapitulo(cap.arquivos, { obraId: parseInt(obraId), numero: parseFloat(cap.numero) });
         if (!resultados) throw new Error(uploadError || "Falha no upload das imagens.");
         await criar.mutateAsync({
           obraId: parseInt(obraId),
@@ -635,4 +635,5 @@ export default function NovoCapituloPage() {
     </div>
   );
 }
+
 
