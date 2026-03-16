@@ -13,9 +13,14 @@ import {
 } from "lucide-react";
 import { useDebounce } from "@/hooks/useDebounce";
 
+const TIPOS_MIDIA = ["Manga", "Manhwa", "Manhua", "Novel", "Light Novel", "Webtoon", "HQ", "Hentai"];
 const GENRES = [
-  "Novel", "Manhwar", "Ação", "Aventura", "Comédia", "Drama", "Fantasia",
-  "Mangá", "Horror", "Mistério", "Romance", "Sci-Fi", "Slice of Life", "Culinaria",
+  "Ação", "Aventura", "Comédia", "Drama", "Fantasia", "Horror",
+  "Mistério", "Romance", "Sci-Fi", "Slice of Life", "Culinária",
+  "Supernatural", "Esportes", "Histórico", "Psicológico", "Ecchi",
+  "Isekai", "Shounen", "Shoujo", "Seinen", "Josei", "Yaoi", "Yuri",
+  "Mahou Shoujo", "Mecha", "Policial", "Artes Marciais", "Reencarnação",
+  "Sistema", "Harem", "Vilã", "Dungeons",
 ];
 
 const CAROUSEL_SIZE = 20;
@@ -127,27 +132,7 @@ function PropagandaBanner({ onClose, onAction }: { onClose: () => void; onAction
               >
                 {p.btnLabel}
               </Button>
-              {/* Menu 3 pontos */}
-              <div className="relative group/menu">
-                <button className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 border border-white/10 flex items-center justify-center transition-colors">
-                  <span className="text-white/70 font-bold text-xs leading-none">•••</span>
-                </button>
-                <div className="absolute right-0 top-9 bg-black/95 border border-white/10 rounded-xl shadow-2xl w-44 py-1.5 hidden group-hover/menu:block z-50">
-                  <button onClick={() => navigate("/loja")}
-                    className="w-full text-left px-4 py-2 text-sm text-white/80 hover:text-white hover:bg-white/5 flex items-center gap-2 transition-colors">
-                    🛍️ Ver Loja
-                  </button>
-                  <button onClick={() => onAction?.("pedido_cargo")}
-                    className="w-full text-left px-4 py-2 text-sm text-white/80 hover:text-white hover:bg-white/5 flex items-center gap-2 transition-colors">
-                    ⚔️ Ser Tradutor
-                  </button>
-                  <div className="border-t border-white/5 my-1" />
-                  <button onClick={() => navigate("/")}
-                    className="w-full text-left px-4 py-2 text-sm text-white/50 hover:text-white hover:bg-white/5 flex items-center gap-2 transition-colors">
-                    📖 Como funciona
-                  </button>
-                </div>
-              </div>
+
             </div>
             {PROPAGANDAS.length > 1 && (
               <div className="flex gap-1.5">
@@ -437,22 +422,43 @@ export default function Home() {
           )}
         </div>
 
-        {/* Filtros de gênero — só aparecem ao buscar */}
+        {/* Filtros — aparecem ao digitar */}
         {buscando && (
-          <div className="flex gap-2 flex-wrap">
-            {GENRES.map((g) => (
-              <button
-                key={g}
-                onClick={() => { setGenre(genre === g ? undefined : g); setRecentLimit(INITIAL_RECENT); }}
-                className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
-                  genre === g
-                    ? "bg-primary border-primary text-white"
-                    : "bg-transparent border-border text-white/60 hover:border-white/40 hover:text-white"
-                }`}
-              >
-                {g}
-              </button>
-            ))}
+          <div className="space-y-2">
+            {/* Tipos de mídia */}
+            <div className="overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+              <div className="flex gap-2 w-max pb-1">
+                <span className="text-[10px] text-white/30 uppercase tracking-wider self-center flex-shrink-0">Tipo</span>
+                {TIPOS_MIDIA.map((g) => (
+                  <button key={g}
+                    onClick={() => { setGenre(genre === g ? undefined : g); setRecentLimit(INITIAL_RECENT); }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all whitespace-nowrap flex-shrink-0 ${
+                      genre === g
+                        ? "bg-purple-600 border-purple-500 text-white"
+                        : "bg-white/5 border-purple-800/30 text-purple-300/60 hover:border-purple-500/50 hover:text-purple-200"
+                    }`}>
+                    {g}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {/* Gêneros */}
+            <div className="overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+              <div className="flex gap-2 w-max pb-1">
+                <span className="text-[10px] text-white/30 uppercase tracking-wider self-center flex-shrink-0">Gênero</span>
+                {GENRES.map((g) => (
+                  <button key={g}
+                    onClick={() => { setGenre(genre === g ? undefined : g); setRecentLimit(INITIAL_RECENT); }}
+                    className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-all whitespace-nowrap flex-shrink-0 ${
+                      genre === g
+                        ? "bg-primary border-primary text-white"
+                        : "bg-white/5 border-border text-white/50 hover:border-white/40 hover:text-white"
+                    }`}>
+                    {g}
+                  </button>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
