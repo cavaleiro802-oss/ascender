@@ -205,9 +205,45 @@ export async function getObraById(id: number) {
   const result = await db.select().from(obras).where(eq(obras.id, id)).limit(1);
   return result[0];
 }
+
+// ─── Slug ─────────────────────────────────────────────────────────────────────
+export function gerarSlug(titulo: string): string {
+  return titulo
+    .toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "") // remove acentos
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-")
+    .slice(0, 280);
+}
+
+export async function getObraBySlug(slug: string) {
+  const db = await getDb(); if (!db) return undefined;
+  const result = await db.select().from(obras).where(eq(obras.slug, slug)).limit(1);
+  return result[0];
+}
+
+export async function getCapituloByObraAndNumero(obraId: number, numero: number) {
+  const db = await getDb(); if (!db) return undefined;
+  const result = await db.select().from(capitulos)
+    .where(and(eq(capitulos.obraId, obraId), sql`${capitulos.numero} = ${numero}`))
+    .limit(1);
+  return result[0];
+}
+
 export async function createObra(data: { title: string; synopsis?: string; genres?: string[]; coverUrl?: string; coverKey?: string; authorId: number; originalAuthor?: string; tipo?: "manga" | "novel"; status: "em_espera" | "aprovada"; andamento?: "em_andamento" | "hiato" | "finalizado"; }) {
   const db = await getDb(); if (!db) throw new Error("DB unavailable");
-  const result = await db.insert(obras).values({ ...data, genres: data.genres ? JSON.stringify(data.genres) : null }).returning();
+  // Gerar slug único
+  const baseSlug = gerarSlug(data.title);
+  let slug = baseSlug;
+  let tentativa = 1;
+  while (true) {
+    const existe = await db.select({ id: obras.id }).from(obras).where(eq(obras.slug, slug)).limit(1);
+    if (existe.length === 0) break;
+    slug = `${baseSlug}-${tentativa++}`;
+  }
+  const result = await db.insert(obras).values({ ...data, slug, genres: data.genres ? JSON.stringify(data.genres) : null }).returning();
   return result[0];
 }
 export async function updateObra(obraId: number, data: { title?: string; synopsis?: string; genres?: string[]; andamento?: "em_andamento" | "hiato" | "finalizado"; coverUrl?: string; }) {
@@ -377,7 +413,7 @@ export async function listComentarios(obraId: number) {
     })
     .from(comentarios)
     .leftJoin(users, eq(comentarios.autorId, users.id))
-    .where(and(eq(comentarios.obraId, obraId), eq(comentarios.deleted, false), sql`${comentarios.capituloId} IS NULL`))
+    .where(and(eq(comentarios.obraId, obraId), eq(comentarios.deleted, false)))
     .orderBy(desc(comentarios.createdAt));
 
   // Mapear parentAutorNome
