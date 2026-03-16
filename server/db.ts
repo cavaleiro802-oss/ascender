@@ -377,7 +377,7 @@ export async function listComentarios(obraId: number) {
     })
     .from(comentarios)
     .leftJoin(users, eq(comentarios.autorId, users.id))
-    .where(and(eq(comentarios.obraId, obraId), eq(comentarios.deleted, false)))
+    .where(and(eq(comentarios.obraId, obraId), eq(comentarios.deleted, false), sql`${comentarios.capituloId} IS NULL`))
     .orderBy(desc(comentarios.createdAt));
 
   // Mapear parentAutorNome
