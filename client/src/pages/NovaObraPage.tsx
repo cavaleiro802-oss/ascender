@@ -46,7 +46,7 @@ export default function NovaObraPage() {
   const criar = trpc.obras.create.useMutation({
     onSuccess: (obra) => {
       toast.success("Obra enviada! Aguardando aprovação do admin.");
-      navigate(`/obra/${obra.id}`);
+      navigate(`/obra/${obra.slug ?? obra.id}`);
     },
     onError: (e) => toast.error(e.message),
   });
