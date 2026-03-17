@@ -65,3 +65,15 @@
     @apply w-full aspect-[3/4] bg-secondary object-cover;
   }
 }
+
+/* ── Moldura animada ─────────────────────────────────────────────────────────── */
+@keyframes molduraGiro {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@keyframes molduraCaneta {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25%       { transform: rotate(4deg) scale(1.03); }
+  75%       { transform: rotate(-4deg) scale(1.03); }
+}
