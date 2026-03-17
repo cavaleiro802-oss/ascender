@@ -1,3 +1,4 @@
+
 import { Router } from "express";
 import multer from "multer";
 import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
@@ -176,7 +177,7 @@ uploadRouter.post("/loja", multer({ storage: multer.memoryStorage(), limits: { f
   try {
     const user = await getUser(req);
     if (!user) return res.status(401).json({ error: "Faça login primeiro." });
-    if (!isSupremeAdminRole(user.role)) return res.status(403).json({ error: "Acesso restrito." });
+    if (user.role !== "admin_supremo") return res.status(403).json({ error: "Acesso restrito." });
 
     if (!req.file) return res.status(400).json({ error: "Arquivo obrigatório." });
 
