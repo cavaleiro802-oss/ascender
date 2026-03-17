@@ -94,12 +94,12 @@ async function fetchComTimeout(url: string, opts: RequestInit, ms: number): Prom
 
 export async function uploadPaginas(
   files: File[],
-  onProgress?: (atual: number, total: number) => void
+  onProgress?: (atual: number, total: number) => void,
+  contexto?: { obraId: number; numero: number }
 ): Promise<UploadResult[]> {
-  // 1. Pedir presigned URLs — com tratamento de erro legível
-  // Comprimir imagens antes do upload (economiza ~70% de bandwidth)
+  // Comprimir e converter para WebP antes do upload
   const arquivosOtimizados = await Promise.all(
-    files.map((f) => comprimirImagem(f))
+    files.map((f) => comprimirImagem(f, 0.85, 1800))
   );
 
   let presignRes: Response;
@@ -109,7 +109,9 @@ export async function uploadPaginas(
       credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        arquivos: arquivosOtimizados.map((f) => ({ tipo: f.type || "image/jpeg", tamanho: f.size })),
+        arquivos: arquivosOtimizados.map((f) => ({ tipo: f.type || "image/webp", tamanho: f.size })),
+        obraId: contexto?.obraId,
+        numeroCapitulo: contexto?.numero,
       }),
     }, 30_000);
   } catch (e: any) {
