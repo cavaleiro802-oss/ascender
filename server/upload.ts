@@ -141,17 +141,16 @@ uploadRouter.post("/presign", async (req, res) => {
     }
 
     // Gera uma presigned URL por imagem com path organizado
-    // Estrutura: obras/obraId/cap-numero/001.webp
+    // Estrutura: obras/obraId/cap-numero/UUID.webp (UUID evita colisão entre uploads simultâneos)
     const pasta = obraId && numeroCapitulo !== undefined
       ? `obras/${obraId}/cap-${numeroCapitulo}`
-      : `paginas`; // fallback para uploads sem contexto
+      : `paginas`;
 
     const urls = await Promise.all(
       arquivos.map(async (a, idx) => {
-        // Sempre salvar como webp (browser já converteu)
         const ext = a.tipo === "image/webp" ? "webp" : a.tipo.split("/")[1].replace("jpeg", "jpg");
-        const pagNum = String(idx + 1).padStart(3, "0"); // 001, 002, 003...
-        const key = `${pasta}/${pagNum}.${ext}`;
+        const pagNum = String(idx + 1).padStart(3, "0");
+        const key = `${pasta}/${pagNum}-${uuid()}.${ext}`;
         const command = new PutObjectCommand({
           Bucket: BUCKET,
           Key: key,
