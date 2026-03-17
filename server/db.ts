@@ -653,6 +653,7 @@ export async function equiparItem(userId: number, itemId: number) {
   // Desequipar outros do mesmo tipo
   const itensDoTipo = await db.select({ ui: usuarioItens, li: lojaItens })
     .from(usuarioItens)
+    .leftJoin(lojaItens, eq(usuarioItens.itemId, lojaItens.id))
     .where(eq(usuarioItens.userId, userId));
   // Simples: desequipar todos do mesmo tipo antes
   for (const { ui, li } of itensDoTipo as any[]) {
