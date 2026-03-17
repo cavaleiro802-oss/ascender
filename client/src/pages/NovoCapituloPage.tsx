@@ -104,7 +104,7 @@ function AbaUnico({ obraId }: { obraId: string }) {
       toast.success("Capítulo enviado!");
       utils.obras.listRecent?.invalidate();
       utils.capitulos.list.invalidate({ obraId: parseInt(obraId) });
-      navigate(`/obra/${obraId}`);
+      navigate(`/obra/${slug ?? obraId}`);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -167,7 +167,7 @@ function AbaUnico({ obraId }: { obraId: string }) {
   async function handleSubmit() {
     if (!numero || isNaN(parseFloat(numero))) return toast.error("Número do capítulo obrigatório.");
     if (arquivos.length === 0) return toast.error("Adicione pelo menos 1 página.");
-    const resultados = await uploadCapitulo(arquivos, { obraId: parseInt(obraId), numero: parseFloat(numero) });
+    const resultados = await uploadCapitulo(arquivos);
     if (!resultados) return;
     await criar.mutateAsync({
       obraId: parseInt(obraId),
@@ -330,7 +330,7 @@ function AbaLote({ obraId }: { obraId: string }) {
     async function enviarCap(cap: CapLote, i: number) {
       setCaps((prev) => prev.map((c, idx) => idx === i ? { ...c, status: "enviando" } : c));
       try {
-        const resultados = await uploadCapitulo(cap.arquivos, { obraId: parseInt(obraId), numero: parseFloat(cap.numero) });
+        const resultados = await uploadCapitulo(cap.arquivos);
         if (!resultados) throw new Error(uploadError || "Falha no upload das imagens.");
         await criar.mutateAsync({
           obraId: parseInt(obraId),
@@ -358,7 +358,7 @@ function AbaLote({ obraId }: { obraId: string }) {
 
     if (sucessos === caps.length) {
       toast.success(`${sucessos} capítulo${sucessos !== 1 ? "s" : ""} enviado${sucessos !== 1 ? "s" : ""} com sucesso!`);
-      setTimeout(() => navigate(`/obra/${obraId}`), 1500);
+      setTimeout(() => navigate(`/obra/${slug ?? obraId}`), 1500);
     } else {
       toast.error(`${sucessos}/${caps.length} enviados. Verifique os erros.`);
     }
@@ -499,7 +499,7 @@ function AbaNovel({ obraId }: { obraId: string }) {
     onSuccess: () => {
       toast.success("Capítulo enviado!");
       utils.capitulos.list.invalidate({ obraId: parseInt(obraId) });
-      navigate(`/obra/${obraId}`);
+      navigate(`/obra/${slug ?? obraId}`);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -564,13 +564,14 @@ Cada linha em branco vira uma quebra de parágrafo na leitura."
 
 // ─── Página principal ──────────────────────────────────────────────────────────
 export default function NovoCapituloPage() {
-  const { id: obraId } = useParams<{ id: string }>();
+  const { slug } = useParams<{ slug: string }>();
   const { user, isAuthenticated } = useAuth();
   const [aba, setAba] = useState<"unico" | "lote">("unico");
 
-  const { data: obra, isLoading: obraLoading } = trpc.obras.byId.useQuery(
-    { id: parseInt(obraId) }, { enabled: !!obraId }
+  const { data: obra, isLoading: obraLoading } = trpc.obras.bySlug.useQuery(
+    { slug: slug ?? "" }, { enabled: !!slug }
   );
+  const obraId = obra?.id ? String(obra.id) : "";
 
   if (!isAuthenticated || !user || user.role === "usuario") {
     return (
