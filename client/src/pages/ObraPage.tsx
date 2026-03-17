@@ -61,10 +61,17 @@ function Comentario({
   const inicial = nome.slice(0, 1).toUpperCase();
   return (
     <div className="flex gap-3 group">
-      <div className="w-8 h-8 rounded-full bg-primary/20 flex-shrink-0 flex items-center justify-center text-xs font-bold text-primary mt-0.5">
-        {c.autorAvatar ? (
-          <img src={cfAvatar(c.autorAvatar)} alt={nome} className="w-full h-full object-cover rounded-full" />
-        ) : inicial}
+      <div className="relative w-8 h-8 flex-shrink-0 mt-0.5">
+        <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary overflow-hidden">
+          {c.autorAvatar ? (
+            <img src={cfAvatar(c.autorAvatar)} alt={nome} className="w-full h-full object-cover rounded-full" />
+          ) : inicial}
+        </div>
+        {c.autorCosmeticos?.moldura?.mediaUrl && (
+          <img src={c.autorCosmeticos.moldura.mediaUrl} alt="moldura"
+            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+            style={{ zIndex: 2, animation: "molduraGiro 8s linear infinite", transformOrigin: "center center" }} />
+        )}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 mb-1">
@@ -634,3 +641,4 @@ export default function ObraPage() {
     </div>
   );
 }
+
