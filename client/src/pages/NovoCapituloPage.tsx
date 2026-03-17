@@ -88,7 +88,7 @@ async function extrairZip(file: File): Promise<CapLote[]> {
 }
 
 // ─── Aba cap único ─────────────────────────────────────────────────────────────
-function AbaUnico({ obraId }: { obraId: string }) {
+function AbaUnico({ obraId, slug }: { obraId: string; slug: string }) {
   const [, navigate] = useLocation();
   const fileRef = useRef<HTMLInputElement>(null);
   const [numero, setNumero] = useState("");
@@ -104,7 +104,7 @@ function AbaUnico({ obraId }: { obraId: string }) {
       toast.success("Capítulo enviado!");
       utils.obras.listRecent?.invalidate();
       utils.capitulos.list.invalidate({ obraId: parseInt(obraId) });
-      navigate(`/obra/${slug ?? obraId}`);
+      navigate(`/obra/${slug || obraId}`);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -260,7 +260,7 @@ function AbaUnico({ obraId }: { obraId: string }) {
 }
 
 // ─── Aba lote ZIP ──────────────────────────────────────────────────────────────
-function AbaLote({ obraId }: { obraId: string }) {
+function AbaLote({ obraId, slug }: { obraId: string; slug: string }) {
   const [, navigate] = useLocation();
   const zipRef = useRef<HTMLInputElement>(null);
   const [caps, setCaps] = useState<CapLote[]>([]);
@@ -358,7 +358,7 @@ function AbaLote({ obraId }: { obraId: string }) {
 
     if (sucessos === caps.length) {
       toast.success(`${sucessos} capítulo${sucessos !== 1 ? "s" : ""} enviado${sucessos !== 1 ? "s" : ""} com sucesso!`);
-      setTimeout(() => navigate(`/obra/${slug ?? obraId}`), 1500);
+      setTimeout(() => navigate(`/obra/${slug || obraId}`), 1500);
     } else {
       toast.error(`${sucessos}/${caps.length} enviados. Verifique os erros.`);
     }
@@ -488,7 +488,7 @@ function AbaLote({ obraId }: { obraId: string }) {
 }
 
 // ─── Aba Novel (texto) ────────────────────────────────────────────────────────
-function AbaNovel({ obraId }: { obraId: string }) {
+function AbaNovel({ obraId, slug }: { obraId: string; slug: string }) {
   const [, navigate] = useLocation();
   const [numero, setNumero] = useState("");
   const [title, setTitle] = useState("");
@@ -499,7 +499,7 @@ function AbaNovel({ obraId }: { obraId: string }) {
     onSuccess: () => {
       toast.success("Capítulo enviado!");
       utils.capitulos.list.invalidate({ obraId: parseInt(obraId) });
-      navigate(`/obra/${slug ?? obraId}`);
+      navigate(`/obra/${slug || obraId}`);
     },
     onError: (e) => toast.error(e.message),
   });
@@ -607,7 +607,7 @@ export default function NovoCapituloPage() {
         )}
 
         {isNovel ? (
-          <AbaNovel obraId={obraId} />
+          <AbaNovel obraId={obraId} slug={slug ?? ""} />
         ) : (
           <>
             {/* Seletor de aba — só para manga */}
@@ -629,12 +629,13 @@ export default function NovoCapituloPage() {
                 📦 Lote (ZIP)
               </button>
             </div>
-            {aba === "unico" ? <AbaUnico obraId={obraId} /> : <AbaLote obraId={obraId} />}
+            {aba === "unico" ? <AbaUnico obraId={obraId} slug={slug ?? ""} /> : <AbaLote obraId={obraId} slug={slug ?? ""} />}
           </>
         )}
       </main>
     </div>
   );
 }
+
 
 
