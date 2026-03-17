@@ -122,7 +122,7 @@ export default function PerfilPage() {
                   }
                 </div>
                 {molduraUrl && (
-                  <img src={molduraUrl} alt="moldura" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ zIndex: 2 }} />
+                  <img src={molduraUrl} alt="moldura" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ zIndex: 2, animation: "molduraGiro 8s linear infinite", transformOrigin: "center center" }} />
                 )}
                 {isEditing && (
                   <button onClick={() => fileRef.current?.click()}
