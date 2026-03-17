@@ -169,5 +169,34 @@ uploadRouter.post("/presign", async (req, res) => {
   }
 });
 
+
+// ─── POST /api/upload/loja ────────────────────────────────────────────────────
+// Upload de mídia para itens da loja (molduras, banners, etc)
+uploadRouter.post("/loja", multer({ storage: multer.memoryStorage(), limits: { fileSize: 20 * 1024 * 1024 } }).single("file"), async (req, res) => {
+  try {
+    const user = await getUser(req);
+    if (!user) return res.status(401).json({ error: "Faça login primeiro." });
+    if (!isSupremeAdminRole(user.role)) return res.status(403).json({ error: "Acesso restrito." });
+
+    if (!req.file) return res.status(400).json({ error: "Arquivo obrigatório." });
+
+    const ext = req.file.mimetype.split("/")[1]?.replace("jpeg", "jpg") || "webp";
+    const key = `molduras/${uuid()}.${ext}`;
+
+    await r2.send(new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      Body: req.file.buffer,
+      ContentType: req.file.mimetype,
+    }));
+
+    const url = `${PUBLIC_URL}/${key}`;
+    res.json({ url, key });
+  } catch (e: any) {
+    console.error("[Upload Loja] erro:", e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
 export default uploadRouter;
 
