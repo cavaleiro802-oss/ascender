@@ -264,13 +264,25 @@ function CapitulosTab() {
 // ─── Gerenciar Caps Tab ───────────────────────────────────────────────────────
 function GerenciarCapsTab() {
   const utils = trpc.useUtils();
+  const [busca, setBusca] = useState("");
   const [obraId, setObraId] = useState("");
   const [buscando, setBuscando] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<any>(null);
 
+  // Busca por slug
+  const { data: obraBySlug } = trpc.obras.bySlug.useQuery(
+    { slug: busca.trim() },
+    { enabled: buscando && !!busca && isNaN(parseInt(busca)) }
+  );
+
+  // Resolve obraId — aceita número direto ou slug
+  const obraIdResolvido = !isNaN(parseInt(busca))
+    ? parseInt(busca)
+    : obraBySlug?.id ?? 0;
+
   const { data: caps = [], isLoading, refetch } = trpc.capitulos.searchByObra.useQuery(
-    { obraId: parseInt(obraId) },
-    { enabled: buscando && !!obraId && !isNaN(parseInt(obraId)) }
+    { obraId: obraIdResolvido },
+    { enabled: buscando && obraIdResolvido > 0 }
   );
 
   const deleteCap = trpc.capitulos.delete.useMutation({
@@ -283,7 +295,7 @@ function GerenciarCapsTab() {
   });
 
   function buscar() {
-    if (!obraId || isNaN(parseInt(obraId))) return toast.error("ID da obra inválido.");
+    if (!busca.trim()) return toast.error("Digite o slug ou ID da obra.");
     setBuscando(true);
     refetch();
   }
@@ -293,15 +305,20 @@ function GerenciarCapsTab() {
       <h2 className="text-sm font-bold text-white/70 uppercase tracking-wider">Gerenciar Capítulos</h2>
       <div className="flex gap-2">
         <Input
-          type="number"
-          placeholder="ID da obra (ex: 5)"
-          value={obraId}
-          onChange={(e) => { setObraId(e.target.value); setBuscando(false); }}
+          placeholder="Slug (ex: apocalypse-bringer) ou ID (ex: 5)"
+          value={busca}
+          onChange={(e) => { setBusca(e.target.value); setBuscando(false); }}
           className="bg-secondary border-border text-white max-w-xs"
           onKeyDown={(e) => e.key === "Enter" && buscar()}
         />
         <Button onClick={buscar} className="bg-primary text-white">Buscar</Button>
       </div>
+      {buscando && obraBySlug && (
+        <p className="text-xs text-green-400">✅ Obra encontrada: <strong>{obraBySlug.title}</strong> (ID: {obraBySlug.id})</p>
+      )}
+      {buscando && !isNaN(parseInt(busca)) === false && !obraBySlug && !isLoading && (
+        <p className="text-xs text-red-400">Obra não encontrada para esse slug.</p>
+      )}
 
       {isLoading && <p className="text-muted-foreground text-sm">Carregando...</p>}
 
