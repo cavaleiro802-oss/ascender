@@ -1,642 +1,333 @@
-import { useState, useRef, useCallback } from "react";
-import { unzip } from "fflate";
+import { cfPagina, cfAvatar } from "@/lib/imageUtils";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useParams, useLocation } from "wouter";
 import { trpc } from "@/lib/trpc";
-import { useAuth } from "@/hooks/useAuth";
-import { useUpload } from "@/lib/upload";
-import Topbar from "@/components/Topbar";
+import { ChevronLeft, ChevronRight, ArrowLeft, AlignJustify, MousePointer, MessageCircle, Send, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { toast } from "sonner";
-import { ImagePlus, Loader2, X, Upload, Package, CheckCircle2, AlertCircle } from "lucide-react";
+import AscenderLoader from "@/components/AscenderLoader";
+import { useAuth } from "@/hooks/useAuth";
 
-// ─── Tipos ────────────────────────────────────────────────────────────────────
-interface CapLote {
-  pasta: string;
-  numero: string;
-  arquivos: File[];
-  previews: string[];
-  status: "pendente" | "enviando" | "ok" | "erro";
-  erro?: string;
-}
+type Modo = "scroll" | "click";
 
-// ─── Extrai zip/cbz no browser usando fflate ─────────────────────────────────
-async function extrairZip(file: File): Promise<CapLote[]> {
-  const buffer = await file.arrayBuffer();
-  const uint8 = new Uint8Array(buffer);
-
-  return new Promise((resolve, reject) => {
-    unzip(uint8, (err, files) => {
-      if (err) return reject(new Error("ZIP/CBZ inválido ou corrompido."));
-
-      const IMGS = ["jpg", "jpeg", "png", "webp"];
-      const grupos: Record<string, File[]> = {};
-      const imgsRaiz: File[] = [];
-
-      for (const [path, data] of Object.entries(files)) {
-        if (data.length === 0) continue;
-        const partes = path.split("/").filter(Boolean);
-        const nome = partes[partes.length - 1];
-        const ext = nome.split(".").pop()?.toLowerCase() ?? "";
-        if (!IMGS.includes(ext)) continue;
-
-        const mime = (ext === "jpg" || ext === "jpeg") ? "image/jpeg"
-          : ext === "png" ? "image/png" : "image/webp";
-        const f = new File([new Blob([data], { type: mime })], nome, { type: mime });
-
-        if (partes.length === 1) {
-          // Imagem na raiz (CBZ flat)
-          imgsRaiz.push(f);
-        } else {
-          const pasta = partes[0];
-          if (!grupos[pasta]) grupos[pasta] = [];
-          grupos[pasta].push(f);
-        }
-      }
-
-      // CBZ flat: todas as imagens na raiz = 1 capítulo
-      if (Object.keys(grupos).length === 0 && imgsRaiz.length > 0) {
-        imgsRaiz.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-        const match = file.name.match(/(\d+(?:\.\d+)?)/);
-        const preview = [URL.createObjectURL(imgsRaiz[0])];
-        return resolve([{
-          pasta: file.name,
-          numero: match ? match[1] : "",
-          arquivos: imgsRaiz,
-          previews: preview,
-          status: "pendente",
-        }]);
-      }
-
-      const caps: CapLote[] = Object.entries(grupos)
-        .sort(([a], [b]) => a.localeCompare(b, undefined, { numeric: true }))
-        .map(([pasta, arquivos]) => {
-          arquivos.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-          const match = pasta.match(/(\d+(?:\.\d+)?)/);
-          const previews = [URL.createObjectURL(arquivos[0])];
-          return { pasta, numero: match ? match[1] : "", arquivos, previews, status: "pendente" as const };
-        });
-
-      if (caps.length === 0) {
-        return reject(new Error("Nenhuma imagem encontrada. Organize em pastas (cap1/, cap2/...) ou use CBZ com imagens na raiz."));
-      }
-
-      resolve(caps);
-    });
-  });
-}
-
-// ─── Aba cap único ─────────────────────────────────────────────────────────────
-function AbaUnico({ obraId, slug }: { obraId: string; slug: string }) {
+export default function CapituloPage() {
+  const { slug, numero } = useParams<{ slug: string; numero: string }>();
   const [, navigate] = useLocation();
-  const fileRef = useRef<HTMLInputElement>(null);
-  const [numero, setNumero] = useState("");
-  const [title, setTitle] = useState("");
-  const [arquivos, setArquivos] = useState<File[]>([]);
-  const [previews, setPreviews] = useState<string[]>([]);
-  const [extraindo, setExtraindo] = useState(false);
-  const utils = trpc.useUtils();
-  const { uploading, progress, error: uploadError, uploadCapitulo } = useUpload();
+  const [modo, setModo] = useState<Modo>(() =>
+    (localStorage.getItem("asc_leitor_modo") as Modo) ?? "scroll"
+  );
+  const [paginaAtual, setPaginaAtual] = useState(0);
+  const [cabecalhoVisivel, setCabecalhoVisivel] = useState(true);
+  const [textoComentario, setTextoComentario] = useState("");
+  const [lastScroll, setLastScroll] = useState(0);
 
-  const criar = trpc.capitulos.create.useMutation({
-    onSuccess: () => {
-      toast.success("Capítulo enviado!");
-      utils.obras.listRecent?.invalidate();
-      utils.capitulos.list.invalidate({ obraId: parseInt(obraId) });
-      navigate(`/obra/${slug || obraId}`);
-    },
-    onError: (e) => toast.error(e.message),
-  });
+  const { data: capitulo, isLoading } = trpc.capitulos.bySlugAndNumero.useQuery(
+    { slug: slug ?? "", numero: parseFloat(numero ?? "0") }, { enabled: !!slug && !!numero }
+  );
+  const obraId = capitulo?.obraId;
+  const capId  = capitulo?.id;
+  const { data: todosCapitulos = [] } = trpc.capitulos.list.useQuery(
+    { obraId: obraId ?? 0 }, { enabled: !!obraId }
+  );
+  const registrarView = trpc.capitulos.incrementViews.useMutation();
+  const { user, isAuthenticated } = useAuth();
+  const registrarHistorico = trpc.leitura.update.useMutation();
+  const hasRegisteredHistory = useRef(false);
 
-  async function handleFiles(files: FileList | null) {
-    if (!files) return;
-    const lista = Array.from(files);
-
-    // Se selecionou CBZ/ZIP, extrai automaticamente
-    const zips = lista.filter((f) => f.name.match(/\.(zip|cbz)$/i));
-    const imagens = lista.filter((f) => ["image/jpeg", "image/jpg", "image/png", "image/webp"].includes(f.type));
-
-    if (zips.length > 0) {
-      setExtraindo(true);
-      try {
-        // Extrai o primeiro zip/cbz e usa as imagens dele
-        const caps = await extrairZip(zips[0]);
-        if (caps.length > 1) {
-          toast.error("Esse arquivo tem múltiplos capítulos. Use a aba Lote (ZIP).");
-          return;
-        }
-        if (caps.length === 1) {
-          const cap = caps[0];
-          setArquivos(cap.arquivos);
-          setPreviews(cap.arquivos.slice(0, 6).map((f) => URL.createObjectURL(f)));
-          // Autodetectar número do cap se o campo estiver vazio
-          if (!numero && cap.numero) {
-            // não tem setter aqui, feito via prop interna
-          }
-          toast.success(`${cap.arquivos.length} imagens carregadas do ${zips[0].name}`);
-        }
-      } catch (e: any) {
-        toast.error(e.message);
-      } finally {
-        setExtraindo(false);
-      }
-      return;
+  useEffect(() => {
+    if (capId) {
+      registrarView.mutate({ id: capId });
+      hasRegisteredHistory.current = false;
     }
+  }, [slug, numero]);
 
-    const validos = imagens.filter((f) => {
-      if (f.size > 50 * 1024 * 1024) {
-        toast.error(`${f.name}: muito grande (máx 50MB).`); return false;
-      }
-      return true;
-    });
-    if (arquivos.length + validos.length > 500) { toast.error("Máximo de 500 páginas."); return; }
-    setArquivos((p) => [...p, ...validos]);
-    setPreviews((p) => [...p, ...validos.slice(0, 6).map((f) => URL.createObjectURL(f))]);
-  }
-
-  function removerPagina(idx: number) {
-    setArquivos((p) => p.filter((_, i) => i !== idx));
-    setPreviews((p) => p.filter((_, i) => i !== idx));
-  }
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault(); handleFiles(e.dataTransfer.files);
-  }, [arquivos]);
-
-  async function handleSubmit() {
-    if (!numero || isNaN(parseFloat(numero))) return toast.error("Número do capítulo obrigatório.");
-    if (arquivos.length === 0) return toast.error("Adicione pelo menos 1 página.");
-    const resultados = await uploadCapitulo(arquivos, { obraId: parseInt(obraId), numero: parseFloat(numero) });
-    if (!resultados) return;
-    await criar.mutateAsync({
-      obraId: parseInt(obraId),
-      numero: parseFloat(numero),
-      title: title.trim() || undefined,
-      paginas: resultados.map((r) => r.publicUrl),
-      paginasKeys: resultados.map((r) => r.key),
+  // [9] Registrar no histórico quando chegar ao fim (modo scroll = scroll para baixo; modo click = última página)
+  function registrarLeitura() {
+    if (!isAuthenticated || hasRegisteredHistory.current || !capId || !obraId) return;
+    hasRegisteredHistory.current = true;
+    registrarHistorico.mutate({
+      capituloId: capId ?? 0,
+      obraId: obraId ?? 0,
+      progresso: 100,
     });
   }
 
-  const isLoading = uploading || criar.isPending || extraindo;
+  const paginas: string[] = capitulo?.paginas ? JSON.parse(capitulo.paginas) : [];
+  const isNovel = !!(capitulo as any)?.conteudo && paginas.length === 0;
+
+  // Incluir aprovado + aguardando (para tradutor_oficial e admins verem seus caps)
+  const capsVisiveis = (todosCapitulos as any[])
+    .filter((c) => c.status === "aprovado" || c.status === "aguardando")
+    .sort((a, b) => a.numero - b.numero);
+  const idx = capsVisiveis.findIndex((c) => c.id === capId);
+  const capAnterior = capsVisiveis[idx - 1];
+  const capProximo = capsVisiveis[idx + 1];
+
+  useEffect(() => {
+    if (modo !== "scroll") return;
+    const handler = () => {
+      const curr = window.scrollY;
+      setCabecalhoVisivel(curr < lastScroll || curr < 80);
+      setLastScroll(curr);
+      // [9] Detectar fim da página
+      const scrollBottom = window.scrollY + window.innerHeight;
+      const pageHeight = document.documentElement.scrollHeight;
+      if (scrollBottom >= pageHeight - 200) registrarLeitura();
+    };
+    window.addEventListener("scroll", handler, { passive: true });
+    return () => window.removeEventListener("scroll", handler);
+  }, [modo, lastScroll]);
+
+  const handleKey = useCallback((e: KeyboardEvent) => {
+    if (modo !== "click") return;
+    if (e.key === "ArrowRight") setPaginaAtual((p) => Math.min(p + 1, paginas.length - 1));
+    if (e.key === "ArrowLeft") setPaginaAtual((p) => Math.max(p - 1, 0));
+  }, [modo, paginas.length]);
+
+  useEffect(() => {
+    window.addEventListener("keydown", handleKey);
+    return () => window.removeEventListener("keydown", handleKey);
+  }, [handleKey]);
+
+  function trocarModo(m: Modo) {
+    setModo(m);
+    localStorage.setItem("asc_leitor_modo", m);
+    setPaginaAtual(0);
+    window.scrollTo(0, 0);
+  }
+
+  function irCapitulo(cap: any) {
+    navigate(`/obra/${slug}/capitulo/${cap.numero}`);
+    setPaginaAtual(0);
+    window.scrollTo(0, 0);
+  }
+
+  if (isLoading) return <AscenderLoader />;
+  if (!capitulo) return (
+    <div className="min-h-screen bg-black flex items-center justify-center text-white/50">
+      Capítulo não encontrado.
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label className="text-white/80 mb-1.5 block">Número *</Label>
-          <Input type="number" step="0.1" value={numero} onChange={(e) => setNumero(e.target.value)}
-            placeholder="Ex: 42 ou 1.5" className="bg-secondary border-border text-white placeholder:text-muted-foreground" />
-        </div>
-        <div>
-          <Label className="text-white/80 mb-1.5 block">Título <span className="text-muted-foreground font-normal">(opcional)</span></Label>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={255}
-            placeholder="Ex: O Confronto Final" className="bg-secondary border-border text-white placeholder:text-muted-foreground" />
-        </div>
-      </div>
+    <div className="min-h-screen bg-black text-white select-none">
 
-      <div>
-        <Label className="text-white/80 mb-2 block">
-          Páginas * <span className="text-muted-foreground font-normal">({arquivos.length} — em ordem)</span>
-        </Label>
-        <div onDrop={handleDrop} onDragOver={(e) => e.preventDefault()} onClick={() => fileRef.current?.click()}
-          className="border-2 border-dashed border-border hover:border-primary/50 rounded-xl p-8 text-center cursor-pointer transition-colors group">
-          {extraindo ? (
-            <><Loader2 className="w-8 h-8 text-primary mx-auto mb-2 animate-spin" /><p className="text-sm text-white/70">Extraindo arquivo...</p></>
-          ) : (
-            <><ImagePlus className="w-8 h-8 text-white/20 group-hover:text-primary/50 mx-auto mb-2 transition-colors" />
-            <p className="text-sm text-muted-foreground">Clique ou arraste imagens, CBZ ou ZIP</p></>
-          )}
-          <p className="text-xs text-muted-foreground mt-1">JPG, PNG, WebP, CBZ ou ZIP • até 500 páginas</p>
-          <p className="text-xs text-muted-foreground/60 mt-2">📂 No Android: se abrir a galeria, toque nos 3 pontinhos e selecione "Gerenciador de arquivos"</p>
-        </div>
-        <input ref={fileRef} type="file" accept=".jpg,.jpeg,.png,.webp,.zip,.cbz,image/jpeg,image/jpg,image/png,image/webp" multiple className="hidden"
-          onChange={(e) => handleFiles(e.target.files)} />
-      </div>
-
-      {previews.length > 0 && (
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-sm text-white/70">{previews.length} página{previews.length !== 1 ? "s" : ""}</p>
-            <button onClick={() => { setArquivos([]); setPreviews([]); }} className="text-xs text-red-400 hover:text-red-300">Remover todas</button>
+      {/* Cabeçalho flutuante */}
+      <header className={`fixed top-0 left-0 right-0 z-50 bg-black/95 backdrop-blur border-b border-white/10 transition-transform duration-300 ${cabecalhoVisivel ? "translate-y-0" : "-translate-y-full"}`}>
+        <div className="container flex items-center gap-3 h-12">
+          <Button size="icon" variant="ghost" className="text-white/60 hover:text-white shrink-0"
+            onClick={() => navigate(`/obra/${slug}`)}>
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <p className="flex-1 text-sm text-white/70 truncate font-medium">
+            Cap. {capitulo.numero}{capitulo.title ? ` — ${capitulo.title}` : ""}
+          </p>
+          <div className="flex items-center gap-0.5 bg-white/10 rounded-lg p-1">
+            {!isNovel && (["scroll", "click"] as Modo[]).map((m) => (
+              <button key={m} onClick={() => trocarModo(m)}
+                className={`flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium transition-colors ${modo === m ? "bg-primary text-white" : "text-white/50 hover:text-white"}`}>
+                {m === "scroll" ? <AlignJustify className="w-3 h-3" /> : <MousePointer className="w-3 h-3" />}
+                {m === "scroll" ? "Scroll" : "Click"}
+              </button>
+            ))}
+            {isNovel && (
+              <span className="px-2.5 py-1 text-xs font-medium text-white/40">📖 Novel</span>
+            )}
           </div>
-          <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 max-h-80 overflow-y-auto pr-1">
-            {previews.map((src, i) => (
-              <div key={i} className="relative group aspect-[3/4] rounded-lg overflow-hidden bg-secondary">
-                <img src={src} alt={`Página ${i + 1}`} className="w-full h-full object-cover" />
-                <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                  <button onClick={(e) => { e.stopPropagation(); removerPagina(i); }} className="bg-red-600 rounded-full p-1">
-                    <X className="w-3 h-3 text-white" />
-                  </button>
-                </div>
-                <span className="absolute bottom-0.5 left-0 right-0 text-center text-[9px] text-white/70 bg-black/50">{i + 1}</span>
-              </div>
+        </div>
+      </header>
+
+      <div className="pt-12">
+        {isNovel ? (
+          <div className="max-w-2xl mx-auto px-5 py-8 pb-24">
+            <div className="prose prose-invert prose-lg max-w-none">
+              {((capitulo as any).conteudo as string).split("\n").map((paragrafo, i) =>
+                paragrafo.trim() === "" ? (
+                  <div key={i} className="h-4" />
+                ) : (
+                  <p key={i} className="text-white/85 leading-relaxed text-base mb-0">{paragrafo}</p>
+                )
+              )}
+            </div>
+          </div>
+        ) : paginas.length === 0 ? (
+          <div className="flex items-center justify-center min-h-[60vh] text-white/30 text-sm">
+            Nenhuma página disponível.
+          </div>
+        ) : modo === "scroll" ? (
+          <div className="flex flex-col items-center">
+            {paginas.map((url, i) => (
+              <img key={i} src={cfPagina(url)} alt={`Página ${i + 1}`}
+                className="w-full max-w-2xl block"
+                loading={i < 2 ? "eager" : "lazy"}
+              />
             ))}
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="relative flex items-center justify-center min-h-[calc(100vh-3rem)]">
+            <img src={cfPagina(paginas[paginaAtual])} alt={`Página ${paginaAtual + 1}`}
+              className="max-h-[calc(100vh-3rem)] max-w-full object-contain"
+            />
+            {/* [6] Clicar na imagem só troca PÁGINA, nunca capítulo */}
+            <button className="absolute left-0 top-0 w-1/3 h-full"
+              onClick={() => setPaginaAtual((p) => Math.max(p - 1, 0))} />
+            <button className="absolute right-0 top-0 w-1/3 h-full"
+              onClick={() => {
+                if (paginaAtual < paginas.length - 1) {
+                  setPaginaAtual((p) => p + 1);
+                } else {
+                  // [9] Chegou na última página — registrar histórico mas NÃO avançar capítulo automaticamente
+                  registrarLeitura();
+                }
+              }} />
 
-      {uploading && (
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-white/70">Enviando páginas...</span>
-            <span className="text-primary font-bold">{progress}%</span>
-          </div>
-          <div className="h-2 bg-secondary rounded-full overflow-hidden">
-            <div className="h-full bg-primary transition-all duration-300" style={{ width: `${progress}%` }} />
-          </div>
-        </div>
-      )}
-
-      {uploadError && <p className="text-sm text-red-400">{uploadError}</p>}
-
-      <Button onClick={handleSubmit} disabled={isLoading} className="w-full bg-primary hover:bg-primary/90 text-white h-11 text-base font-bold">
-        {isLoading ? (
-          <><Loader2 className="w-4 h-4 mr-2 animate-spin" />{uploading ? `Enviando... ${progress}%` : "Salvando..."}</>
-        ) : `Enviar ${arquivos.length} página${arquivos.length !== 1 ? "s" : ""}`}
-      </Button>
-    </div>
-  );
-}
-
-// ─── Aba lote ZIP ──────────────────────────────────────────────────────────────
-function AbaLote({ obraId, slug }: { obraId: string; slug: string }) {
-  const [, navigate] = useLocation();
-  const zipRef = useRef<HTMLInputElement>(null);
-  const [caps, setCaps] = useState<CapLote[]>([]);
-  const [extraindo, setExtraindo] = useState(false);
-  const [enviando, setEnviando] = useState(false);
-  const [progresso, setProgresso] = useState({ atual: 0, total: 0 });
-  const utils = trpc.useUtils();
-
-  const criar = trpc.capitulos.create.useMutation({ onError: (e) => toast.error(e.message) });
-  const { uploadCapitulo, error: uploadError } = useUpload();
-
-  async function handleZips(files: FileList) {
-    setExtraindo(true);
-    setCaps([]);
-    const todos: CapLote[] = [];
-
-    // Separar zips/cbz de imagens soltas
-    const zips = Array.from(files).filter(f => f.name.match(/\.(zip|cbz)$/i));
-    const imgs = Array.from(files).filter(f => f.type.startsWith("image/"));
-
-    // Processar zips/cbz normalmente
-    for (const zip of zips) {
-      try {
-        const resultado = await extrairZip(zip);
-        todos.push(...resultado);
-      } catch (e: any) {
-        toast.error(`${zip.name}: ${e.message}`);
-      }
-    }
-
-    // Imagens soltas viram um único capítulo
-    if (imgs.length > 0) {
-      imgs.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true }));
-      const previews = imgs.slice(0, 4).map(f => URL.createObjectURL(f));
-      todos.push({
-        pasta: "Imagens soltas",
-        numero: "",
-        arquivos: imgs,
-        previews,
-        status: "pendente",
-      });
-    }
-
-    todos.sort((a, b) => parseFloat(a.numero || "0") - parseFloat(b.numero || "0"));
-    setCaps(todos);
-    if (todos.length > 0) toast.success(`${todos.length} capítulo${todos.length !== 1 ? "s" : ""} detectado${todos.length !== 1 ? "s" : ""}!`);
-    setExtraindo(false);
-  }
-
-  function atualizarNumero(idx: number, valor: string) {
-    setCaps((prev) => prev.map((c, i) => i === idx ? { ...c, numero: valor } : c));
-  }
-
-  async function enviarTodos() {
-    const invalidos = caps.filter((c) => !c.numero || isNaN(parseFloat(c.numero)));
-    if (invalidos.length > 0) {
-      toast.error(`Preencha o número de todos os capítulos (${invalidos.length} sem número).`);
-      return;
-    }
-
-    setEnviando(true);
-    setProgresso({ atual: 0, total: caps.length });
-    let sucessos = 0;
-    let concluidos = 0;
-    const PARALELO = 3; // 3 caps simultâneos — evita sobrecarga
-
-    async function enviarCap(cap: CapLote, i: number) {
-      setCaps((prev) => prev.map((c, idx) => idx === i ? { ...c, status: "enviando" } : c));
-      try {
-        const resultados = await uploadCapitulo(cap.arquivos, { obraId: parseInt(obraId), numero: parseFloat(cap.numero) });
-        if (!resultados) throw new Error(uploadError || "Falha no upload das imagens.");
-        await criar.mutateAsync({
-          obraId: parseInt(obraId),
-          numero: parseFloat(cap.numero),
-          paginas: resultados.map((r) => r.publicUrl),
-          paginasKeys: resultados.map((r) => r.key),
-        });
-        setCaps((prev) => prev.map((c, idx) => idx === i ? { ...c, status: "ok" } : c));
-        sucessos++;
-      } catch (e: any) {
-        setCaps((prev) => prev.map((c, idx) => idx === i ? { ...c, status: "erro", erro: e.message } : c));
-      }
-      concluidos++;
-      setProgresso({ atual: concluidos, total: caps.length });
-    }
-
-    // Enviar em grupos de PARALELO
-    for (let i = 0; i < caps.length; i += PARALELO) {
-      const grupo = caps.slice(i, i + PARALELO).map((cap, j) => enviarCap(cap, i + j));
-      await Promise.all(grupo);
-    }
-
-    setEnviando(false);
-    utils.capitulos.list.invalidate({ obraId: parseInt(obraId) });
-
-    if (sucessos === caps.length) {
-      toast.success(`${sucessos} capítulo${sucessos !== 1 ? "s" : ""} enviado${sucessos !== 1 ? "s" : ""} com sucesso!`);
-      setTimeout(() => navigate(`/obra/${slug || obraId}`), 1500);
-    } else {
-      toast.error(`${sucessos}/${caps.length} enviados. Verifique os erros.`);
-    }
-  }
-
-  return (
-    <div className="space-y-6">
-      {/* Instruções */}
-      <div className="asc-card p-4 border-blue-500/20 bg-blue-500/5">
-        <p className="text-sm text-blue-300 font-bold mb-1">📦 Como organizar o ZIP</p>
-        <p className="text-xs text-blue-200/60">Crie uma pasta por capítulo com as imagens dentro:</p>
-        <pre className="text-xs text-white/40 mt-2 font-mono">
-{`obra.zip
-├── cap1/
-│   ├── 01.jpg
-│   └── 02.jpg
-├── cap2/
-│   ├── 01.jpg
-│   └── 02.jpg`}
-        </pre>
-      </div>
-
-      {/* Upload do ZIP */}
-      <div>
-        <div onClick={() => zipRef.current?.click()}
-          className="border-2 border-dashed border-border hover:border-primary/50 rounded-xl p-8 text-center cursor-pointer transition-colors group">
-          {extraindo ? (
-            <><Loader2 className="w-8 h-8 text-primary mx-auto mb-2 animate-spin" />
-              <p className="text-sm text-white/70">Extraindo ZIP...</p></>
-          ) : (
-            <><Package className="w-8 h-8 text-white/20 group-hover:text-primary/50 mx-auto mb-2 transition-colors" />
-              <p className="text-sm text-muted-foreground">Clique para selecionar arquivos</p>
-              <p className="text-xs text-muted-foreground mt-1">ZIP, CBZ ou imagens soltas • Vários de uma vez • Máx. 500MB cada</p></>
-          )}
-        </div>
-        <input ref={zipRef} type="file" accept=".zip,.cbz,.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp" multiple className="hidden"
-          onChange={(e) => { const files = e.target.files; if (files && files.length > 0) handleZips(files); }} />
-      </div>
-
-      {/* Lista de caps detectados */}
-      {caps.length > 0 && (
-        <div className="space-y-3">
-          <p className="text-sm text-white/70 font-bold">{caps.length} capítulo{caps.length !== 1 ? "s" : ""} detectado{caps.length !== 1 ? "s" : ""}</p>
-          {caps.map((cap, i) => (
-            <div key={i} className={`asc-card p-3 flex items-center gap-3 ${
-              cap.status === "ok" ? "border-green-500/30 bg-green-500/5"
-              : cap.status === "erro" ? "border-red-500/30 bg-red-500/5"
-              : cap.status === "enviando" ? "border-primary/30 bg-primary/5" : ""
-            }`}>
-              {/* Status icon */}
-              <div className="flex-shrink-0">
-                {cap.status === "ok" && <CheckCircle2 className="w-5 h-5 text-green-400" />}
-                {cap.status === "erro" && <AlertCircle className="w-5 h-5 text-red-400" />}
-                {cap.status === "enviando" && <Loader2 className="w-5 h-5 text-primary animate-spin" />}
-                {cap.status === "pendente" && (
-                  <div className="w-5 h-5 rounded-full border-2 border-border flex items-center justify-center text-[10px] text-white/40">{i + 1}</div>
-                )}
-              </div>
-
-              {/* Preview da primeira imagem — onError mostra placeholder */}
-              <div className="w-8 h-10 rounded flex-shrink-0 bg-secondary overflow-hidden">
-                {cap.previews[0] ? (
-                  <img
-                    src={cap.previews[0]}
-                    alt=""
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                      (e.target as HTMLImageElement).style.display = "none";
-                      (e.target as HTMLImageElement).parentElement!.classList.add("flex","items-center","justify-center");
-                      (e.target as HTMLImageElement).insertAdjacentHTML("afterend", '<span class="text-[9px] text-white/30">IMG</span>');
-                    }}
-                  />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <span className="text-[9px] text-white/30">IMG</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Info */}
-              <div className="flex-1 min-w-0">
-                <p className="text-xs text-white/50 truncate">📁 {cap.pasta} — {cap.arquivos.length} imagens</p>
-                {cap.erro && <p className="text-xs text-red-400 mt-0.5">{cap.erro}</p>}
-              </div>
-
-              {/* Número do cap */}
-              <div className="flex-shrink-0 w-24">
-                <Input
-                  type="number"
-                  step="0.1"
-                  placeholder="Nº cap"
-                  value={cap.numero}
-                  onChange={(e) => atualizarNumero(i, e.target.value)}
-                  disabled={cap.status === "enviando" || cap.status === "ok"}
-                  className="bg-secondary border-border text-white text-sm h-8 text-center"
-                />
+            <div className="fixed bottom-6 left-0 right-0 flex justify-center pointer-events-none">
+              <div className="flex items-center gap-3 bg-black/80 backdrop-blur rounded-full px-5 py-2.5 border border-white/10 pointer-events-auto">
+                <button onClick={() => setPaginaAtual((p) => Math.max(p - 1, 0))}
+                  disabled={paginaAtual === 0}
+                  className="text-white/70 hover:text-white disabled:opacity-25 transition-colors">
+                  <ChevronLeft className="w-5 h-5" />
+                </button>
+                <span className="text-sm text-white/70 min-w-[70px] text-center tabular-nums">
+                  {paginaAtual + 1} / {paginas.length}
+                </span>
+                <button onClick={() => setPaginaAtual((p) => Math.min(p + 1, paginas.length - 1))}
+                  disabled={paginaAtual === paginas.length - 1}
+                  className="text-white/70 hover:text-white disabled:opacity-25 transition-colors">
+                  <ChevronRight className="w-5 h-5" />
+                </button>
               </div>
             </div>
-          ))}
+          </div>
+        )}
 
-          {/* Barra de progresso geral */}
-          {enviando && (
-            <div className="space-y-1">
-              <div className="flex justify-between text-xs text-white/60">
-                <span>Enviando capítulos...</span>
-                <span>{progresso.atual}/{progresso.total}</span>
-              </div>
-              <div className="h-2 bg-secondary rounded-full overflow-hidden">
-                <div className="h-full bg-primary transition-all duration-300"
-                  style={{ width: `${(progresso.atual / progresso.total) * 100}%` }} />
-              </div>
-            </div>
-          )}
-
-          <Button onClick={enviarTodos} disabled={enviando || extraindo}
-            className="w-full bg-primary hover:bg-primary/90 text-white h-11 text-base font-bold">
-            {enviando ? (
-              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Enviando {progresso.atual}/{progresso.total}...</>
-            ) : (
-              <><Upload className="w-4 h-4 mr-2" />Enviar {caps.filter(c => c.status !== "ok").length} capítulo{caps.filter(c => c.status !== "ok").length !== 1 ? "s" : ""}</>
-            )}
+        {/* Navegação entre capítulos */}
+        <div className="flex items-center gap-3 p-4 max-w-xl mx-auto mt-6 mb-6">
+          <Button variant="outline" className="flex-1 border-border text-white/60 hover:text-white"
+            disabled={!capAnterior} onClick={() => capAnterior && irCapitulo(capAnterior)}>
+            <ChevronLeft className="w-4 h-4 mr-1" /> Cap. {capAnterior?.numero ?? "—"}
+          </Button>
+          <Button variant="outline" className="border-border text-white/60 hover:text-white px-4"
+            onClick={() => navigate(`/obra/${slug}`)}>
+            Voltar
+          </Button>
+          <Button variant="outline" className="flex-1 border-border text-white/60 hover:text-white"
+            disabled={!capProximo} onClick={() => capProximo && irCapitulo(capProximo)}>
+            Cap. {capProximo?.numero ?? "—"} <ChevronRight className="w-4 h-4 ml-1" />
           </Button>
         </div>
-      )}
+
+        {/* [8] Comentários do capítulo */}
+        <ComentariosCapitulo
+          capituloId={parseInt(capId)}
+          obraId={parseInt(obraId)}
+        />
+      </div>
     </div>
   );
 }
 
-// ─── Aba Novel (texto) ────────────────────────────────────────────────────────
-function AbaNovel({ obraId, slug }: { obraId: string; slug: string }) {
-  const [, navigate] = useLocation();
-  const [numero, setNumero] = useState("");
-  const [title, setTitle] = useState("");
-  const [conteudo, setConteudo] = useState("");
+// ─── Comentários do Capítulo ──────────────────────────────────────────────────
+function ComentariosCapitulo({ capituloId, obraId }: { capituloId: number; obraId: number }) {
+  const { user, isAuthenticated } = useAuth();
   const utils = trpc.useUtils();
+  const [texto, setTexto] = useState("");
+  const [enviando, setEnviando] = useState(false);
 
-  const criar = trpc.capitulos.create.useMutation({
+  const { data: comentarios = [], isLoading } = trpc.comentarios.listByCapitulo.useQuery(
+    { capituloId },
+    { enabled: !!capituloId }
+  );
+
+  const criar = trpc.comentarios.create.useMutation({
     onSuccess: () => {
-      toast.success("Capítulo enviado!");
-      utils.capitulos.list.invalidate({ obraId: parseInt(obraId) });
-      navigate(`/obra/${slug || obraId}`);
+      utils.comentarios.listByCapitulo.invalidate({ capituloId });
+      setTexto("");
+      setEnviando(false);
     },
-    onError: (e) => toast.error(e.message),
+    onError: (e) => { alert(e.message); setEnviando(false); },
   });
 
-  async function handleSubmit() {
-    if (!numero || isNaN(parseFloat(numero))) return toast.error("Número do capítulo obrigatório.");
-    if (conteudo.trim().length < 10) return toast.error("O conteúdo do capítulo está muito curto.");
-    await criar.mutateAsync({
-      obraId: parseInt(obraId),
-      numero: parseFloat(numero),
-      title: title.trim() || undefined,
-      conteudo: conteudo.trim(),
-    });
+  function enviar() {
+    const t = texto.trim();
+    if (!t || !isAuthenticated) return;
+    setEnviando(true);
+    criar.mutate({ obraId, capituloId, content: t });
   }
-
-  const palavras = conteudo.trim() ? conteudo.trim().split(/\s+/).length : 0;
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-4">
-        <div>
-          <Label className="text-white/80 mb-1.5 block">Número *</Label>
-          <Input type="number" step="0.1" value={numero} onChange={(e) => setNumero(e.target.value)}
-            placeholder="Ex: 42 ou 1.5" className="bg-secondary border-border text-white placeholder:text-muted-foreground" />
-        </div>
-        <div>
-          <Label className="text-white/80 mb-1.5 block">Título <span className="text-muted-foreground font-normal">(opcional)</span></Label>
-          <Input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={255}
-            placeholder="Ex: O Confronto Final" className="bg-secondary border-border text-white placeholder:text-muted-foreground" />
-        </div>
-      </div>
+    <div className="max-w-2xl mx-auto px-4 pb-16">
+      <div className="border-t border-white/10 pt-8">
+        <h3 className="text-white font-bold text-base mb-5 flex items-center gap-2">
+          <MessageCircle className="w-4 h-4 text-primary" />
+          Comentários ({comentarios.length})
+        </h3>
 
-      <div>
-        <div className="flex items-center justify-between mb-1.5">
-          <Label className="text-white/80">Conteúdo *</Label>
-          <span className="text-xs text-muted-foreground">{palavras} palavras · {conteudo.length}/500000 chars</span>
-        </div>
-        <textarea
-          value={conteudo}
-          onChange={(e) => setConteudo(e.target.value)}
-          maxLength={500000}
-          rows={20}
-          placeholder="Cole ou escreva o texto do capítulo aqui...
-
-Cada linha em branco vira uma quebra de parágrafo na leitura."
-          className="w-full px-4 py-3 bg-secondary border border-border rounded-xl text-white placeholder:text-muted-foreground text-sm leading-relaxed resize-y focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary font-mono"
-        />
-        <p className="text-xs text-muted-foreground mt-1">
-          💡 Cole direto do Google Docs, Word ou qualquer editor. Quebras de parágrafo são preservadas.
-        </p>
-      </div>
-
-      <Button onClick={handleSubmit} disabled={criar.isPending}
-        className="w-full bg-primary hover:bg-primary/90 text-white h-11 text-base font-bold">
-        {criar.isPending ? (
-          <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Salvando...</>
-        ) : `Enviar capítulo (${palavras} palavras)`}
-      </Button>
-    </div>
-  );
-}
-
-// ─── Página principal ──────────────────────────────────────────────────────────
-export default function NovoCapituloPage() {
-  const { slug } = useParams<{ slug: string }>();
-  const { user, isAuthenticated } = useAuth();
-  const [aba, setAba] = useState<"unico" | "lote">("unico");
-
-  const { data: obra, isLoading: obraLoading } = trpc.obras.bySlug.useQuery(
-    { slug: slug ?? "" }, { enabled: !!slug }
-  );
-  const obraId = obra?.id ? String(obra.id) : "";
-
-  if (!isAuthenticated || !user || user.role === "usuario") {
-    return (
-      <div className="min-h-screen">
-        <Topbar />
-        <div className="container py-20 text-center text-muted-foreground">
-          Acesso restrito a tradutores.
-        </div>
-      </div>
-    );
-  }
-
-  if (obraLoading) {
-    return (
-      <div className="min-h-screen">
-        <Topbar />
-        <div className="container py-20 text-center text-muted-foreground">Carregando...</div>
-      </div>
-    );
-  }
-
-  const isNovel = (obra as any)?.tipo === "novel";
-
-  return (
-    <div className="min-h-screen">
-      <Topbar />
-      <main className="container py-8 max-w-2xl">
-        <h1 className="text-2xl font-black text-white mb-1">
-          {isNovel ? "📖" : "📄"} Novo Capítulo
-        </h1>
-        {obra && (
-          <p className="text-sm text-muted-foreground mb-6">{(obra as any).title}</p>
-        )}
-
-        {isNovel ? (
-          <AbaNovel obraId={obraId} slug={slug ?? ""} />
+        {/* Input de comentário */}
+        {isAuthenticated ? (
+          <div className="flex gap-2 mb-6">
+            <input
+              value={texto}
+              onChange={(e) => setTexto(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && enviar()}
+              placeholder="Escreva um comentário..."
+              maxLength={500}
+              className="flex-1 bg-white/5 border border-white/10 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-primary/50 transition-colors"
+            />
+            <button
+              onClick={enviar}
+              disabled={!texto.trim() || enviando}
+              className="bg-primary hover:bg-primary/90 disabled:opacity-40 text-white rounded-xl px-4 py-2.5 transition-colors flex-shrink-0"
+            >
+              {enviando ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            </button>
+          </div>
         ) : (
-          <>
-            {/* Seletor de aba — só para manga */}
-            <div className="flex gap-2 mb-6 bg-secondary p-1 rounded-xl">
-              <button
-                onClick={() => setAba("unico")}
-                className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${
-                  aba === "unico" ? "bg-primary text-white shadow" : "text-white/50 hover:text-white"
-                }`}
-              >
-                📄 Cap único
-              </button>
-              <button
-                onClick={() => setAba("lote")}
-                className={`flex-1 py-2 px-4 rounded-lg text-sm font-bold transition-all ${
-                  aba === "lote" ? "bg-primary text-white shadow" : "text-white/50 hover:text-white"
-                }`}
-              >
-                📦 Lote (ZIP)
-              </button>
-            </div>
-            {aba === "unico" ? <AbaUnico obraId={obraId} slug={slug ?? ""} /> : <AbaLote obraId={obraId} slug={slug ?? ""} />}
-          </>
+          <p className="text-white/30 text-sm mb-6 text-center py-4 border border-white/5 rounded-xl">
+            Faça login para comentar
+          </p>
         )}
-      </main>
+
+        {/* Lista de comentários */}
+        {isLoading ? (
+          <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-white/30" /></div>
+        ) : comentarios.length === 0 ? (
+          <p className="text-white/20 text-sm text-center py-8">Nenhum comentário ainda. Seja o primeiro!</p>
+        ) : (
+          <div className="space-y-3">
+            {(comentarios as any[]).map((c) => {
+              const cosmeticos = (() => { try { return JSON.parse(c.autorCosmeticos ?? "{}"); } catch { return {}; } })();
+              const molduraUrl = cosmeticos?.moldura?.mediaUrl;
+              const corComentario = cosmeticos?.cor_comentario?.mediaUrl;
+              return (
+                <div key={c.id} className="flex gap-3">
+                  {/* Avatar com moldura */}
+                  <div className="relative w-9 h-9 flex-shrink-0">
+                    <div className="w-9 h-9 rounded-full overflow-hidden bg-primary/20 border border-primary/30">
+                      {c.autorAvatar
+                        ? <img src={cfAvatar(c.autorAvatar)} alt={c.autorNome} className="w-full h-full object-cover" />
+                        : <div className="w-full h-full flex items-center justify-center text-xs font-bold text-primary">{(c.autorNome?.[0] ?? "?").toUpperCase()}</div>
+                      }
+                    </div>
+                    {molduraUrl && (
+                      <img src={molduraUrl} alt="moldura" className="absolute inset-0 w-full h-full object-cover pointer-events-none" style={{ zIndex: 2, animation: "molduraGiro 8s linear infinite", transformOrigin: "center center" }} />
+                    )}
+                  </div>
+                  {/* Balão do comentário */}
+                  <div className="flex-1 bg-white/5 rounded-xl px-4 py-2.5">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="text-xs font-bold text-white/80">{c.autorNome ?? `Usuário #${c.autorId}`}</span>
+                      <span className="text-[10px] text-white/20">
+                        {new Date(c.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    <p className="text-sm leading-relaxed" style={{ color: corComentario ?? "rgba(255,255,255,0.82)" }}>{c.content}</p>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }
-
-
-
-
