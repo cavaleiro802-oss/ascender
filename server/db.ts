@@ -266,7 +266,7 @@ export async function updateObraAuthor(obraId: number, authorId: number) {
 }
 export async function incrementObraViews(obraId: number) {
   const db = await getDb(); if (!db) return;
-  await db.update(obras).set({ viewsTotal: sql`${obras.viewsTotal} + 1`, viewsWeek: sql`${obras.viewsWeek} + 1`, updatedAt: new Date() }).where(eq(obras.id, obraId));
+  await db.update(obras).set({ viewsTotal: sql`${obras.viewsTotal} + 1`, viewsWeek: sql`${obras.viewsWeek} + 1` }).where(eq(obras.id, obraId));
 }
 export async function resetWeeklyViews() {
   const db = await getDb(); if (!db) return;
