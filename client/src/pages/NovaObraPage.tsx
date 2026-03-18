@@ -93,10 +93,22 @@ export default function NovaObraPage() {
     reader.readAsDataURL(file);
   }
 
+  const NOVEL_MIDIAS = ["Novel", "Light Novel"];
+
   function toggleGenre(g: string) {
-    setSelectedGenres((prev) =>
-      prev.includes(g) ? prev.filter((x) => x !== g) : prev.length < 5 ? [...prev, g] : prev
-    );
+    setSelectedGenres((prev) => {
+      const next = prev.includes(g)
+        ? prev.filter((x) => x !== g)
+        : prev.length < 5
+        ? [...prev, g]
+        : prev;
+
+      // Sincroniza o tipo da obra com a mídia selecionada
+      const temNovel = next.some((x) => NOVEL_MIDIAS.includes(x));
+      setTipo(temNovel ? "novel" : "manga");
+
+      return next;
+    });
   }
 
   async function handleSubmit() {
@@ -142,7 +154,11 @@ export default function NovaObraPage() {
             <Label className="text-white/80 mb-2 block">Tipo de Obra *</Label>
             <div className="flex gap-3">
               <button
-                onClick={() => setTipo("manga")}
+                onClick={() => {
+                  setTipo("manga");
+                  // Remove qualquer mídia de novel dos gêneros selecionados
+                  setSelectedGenres((prev) => prev.filter((x) => !NOVEL_MIDIAS.includes(x)));
+                }}
                 className={`flex-1 py-3 rounded-xl border-2 text-sm font-bold transition-all flex flex-col items-center gap-1 ${
                   tipo === "manga"
                     ? "border-primary bg-primary/10 text-white"
@@ -154,7 +170,15 @@ export default function NovaObraPage() {
                 <span className="text-[10px] font-normal opacity-60">Capítulos com imagens</span>
               </button>
               <button
-                onClick={() => setTipo("novel")}
+                onClick={() => {
+                  setTipo("novel");
+                  // Garante que "Novel" está nos gêneros de mídia se nenhum novel-mídia estiver selecionado
+                  setSelectedGenres((prev) => {
+                    const jaTemNovel = prev.some((x) => NOVEL_MIDIAS.includes(x));
+                    if (jaTemNovel) return prev;
+                    return prev.length < 5 ? [...prev, "Novel"] : prev;
+                  });
+                }}
                 className={`flex-1 py-3 rounded-xl border-2 text-sm font-bold transition-all flex flex-col items-center gap-1 ${
                   tipo === "novel"
                     ? "border-primary bg-primary/10 text-white"
