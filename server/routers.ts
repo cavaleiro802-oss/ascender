@@ -383,9 +383,23 @@ const pedidoCargoRouter = router({
       if (ctx.user.bannedTotal || ctx.user.banned) throw new TRPCError({ code: "FORBIDDEN", message: "Sua conta está suspensa." });
       if (ctx.user.ultimoPedidoCargo) {
         const diasPassados = (Date.now() - new Date(ctx.user.ultimoPedidoCargo).getTime()) / (1000 * 60 * 60 * 24);
-        if (diasPassados < 10) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `Aguarde ${Math.ceil(10 - diasPassados)} dia(s) antes de fazer um novo pedido.` });
+        if (diasPassados < 1) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: `Aguarde ${Math.ceil(1 - diasPassados)} dia(s) antes de fazer um novo pedido.` });
       }
       await criarPedidoCargo({ userId: ctx.user.id, tipo: input.tipo, mensagem: input.mensagem });
+      // Notificar todos os admins sobre o novo pedido
+      const admins = await listUsers(1, 100, undefined, "admin_supremo");
+      const adminsSnr = await listUsers(1, 100, undefined, "admin_senhor");
+      const todosAdmins = [...admins, ...adminsSnr];
+      const nomeUsuario = ctx.user.displayName || ctx.user.name || "Alguém";
+      const tipoTexto = input.tipo === "quero_aprender" ? "Quero Aprender" : "Posso Ajudar";
+      await Promise.all(todosAdmins.map((admin: any) =>
+        criarNotificacao({
+          userId: admin.id,
+          tipo: "pedido_cargo",
+          titulo: "📋 Novo pedido de cargo",
+          mensagem: `${nomeUsuario} quer ser tradutor (${tipoTexto})${input.mensagem ? `: "${input.mensagem.slice(0, 80)}${input.mensagem.length > 80 ? "..." : ""}"` : "."}`,
+        })
+      ));
       return { success: true };
     }),
 
@@ -393,7 +407,7 @@ const pedidoCargoRouter = router({
     const pedidos = await listPedidosCargo(1, "pendente");
     const meu = pedidos.find((p: any) => p.userId === ctx.user.id);
     const bloqueadoAte = ctx.user.ultimoPedidoCargo
-      ? new Date(new Date(ctx.user.ultimoPedidoCargo).getTime() + 10 * 24 * 60 * 60 * 1000)
+      ? new Date(new Date(ctx.user.ultimoPedidoCargo).getTime() + 1 * 24 * 60 * 60 * 1000)
       : null;
     return { status: meu?.status ?? null, bloqueadoAte };
   }),
