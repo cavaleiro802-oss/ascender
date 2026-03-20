@@ -12,10 +12,12 @@ import LojaPage from "@/pages/LojaPage";
 import NotFound from "@/pages/NotFound";
 import Footer from "@/components/Footer";
 import LoginPage from "@/pages/LoginPage";
+import ChatWidget from "@/components/ChatWidget";
 
 export default function App() {
   return (
     <>
+      <ChatWidget />
       <Switch>
         <Route path="/" component={Home} />
         <Route path="/login" component={LoginPage} />
