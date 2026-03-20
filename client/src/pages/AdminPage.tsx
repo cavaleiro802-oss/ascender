@@ -144,6 +144,7 @@ function ObrasTab({ isSupreme }: { isSupreme: boolean }) {
   const { data: allObras = [] } = trpc.obras.listAll.useQuery({ status: "aprovada" });
   const [changeAuthorObraId, setChangeAuthorObraId] = useState<number | null>(null);
   const [newAuthorId, setNewAuthorId] = useState("");
+  const [confirmDeleteObraId, setConfirmDeleteObraId] = useState<number | null>(null);
   const [tab, setTab] = useState<"pending" | "all" | "tradutor">("pending");
   const [buscaTradutor, setBuscaTradutor] = useState("");
   const [translatorIdBusca, setTranslatorIdBusca] = useState<number | null>(null);
@@ -152,8 +153,10 @@ function ObrasTab({ isSupreme }: { isSupreme: boolean }) {
     { enabled: translatorIdBusca !== null }
   );
 
-  const approve      = trpc.obras.approve.useMutation({ onSuccess: () => { utils.obras.pending.invalidate(); toast.success("Obra atualizada!"); }, onError: (e) => toast.error(e.message) });
+  const approve      = trpc.obras.approve.useMutation({ onSuccess: () => { utils.obras.pending.invalidate(); utils.obras.listAll.invalidate(); toast.success("Obra atualizada!"); }, onError: (e) => toast.error(e.message) });
   const changeAuthor = trpc.obras.changeAuthor.useMutation({ onSuccess: () => { setChangeAuthorObraId(null); setNewAuthorId(""); toast.success("Dono atualizado!"); }, onError: (e) => toast.error(e.message) });
+  const archive      = trpc.obras.archive.useMutation({ onSuccess: () => { utils.obras.listAll.invalidate(); utils.obras.pending.invalidate(); toast.success("Obra arquivada!"); }, onError: (e) => toast.error(e.message) });
+  const deleteObra   = trpc.obras.deleteObra.useMutation({ onSuccess: () => { utils.obras.listAll.invalidate(); utils.obras.pending.invalidate(); toast.success("Obra deletada!"); setConfirmDeleteObraId(null); }, onError: (e) => toast.error(e.message) });
 
   const renderObraCard = (obra: any, showApprove = false) => (
     <div key={obra.id} className="asc-card p-4">
@@ -171,8 +174,20 @@ function ObrasTab({ isSupreme }: { isSupreme: boolean }) {
             </>
           )}
           <Button size="sm" variant="outline" className="border-border bg-transparent text-white/60 text-xs" onClick={() => setChangeAuthorObraId(changeAuthorObraId === obra.id ? null : obra.id)}>Trocar Dono</Button>
+          <Button size="sm" variant="outline" className="border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10 bg-transparent text-xs" onClick={() => archive.mutate({ id: obra.id })} disabled={archive.isPending}>📦 Arquivar</Button>
+          <Button size="sm" variant="outline" className="border-red-500/40 text-red-500 hover:bg-red-500/10 bg-transparent text-xs" onClick={() => setConfirmDeleteObraId(obra.id)}>🗑️ Deletar</Button>
         </div>
       </div>
+      {/* Confirmação de deleção */}
+      {confirmDeleteObraId === obra.id && (
+        <div className="mt-3 pt-3 border-t border-red-500/30 bg-red-500/5 rounded-lg p-3">
+          <p className="text-sm text-red-400 font-semibold mb-2">⚠️ Tem certeza? Essa ação é irreversível!</p>
+          <div className="flex gap-2">
+            <Button size="sm" className="bg-red-600 hover:bg-red-700 text-white" onClick={() => deleteObra.mutate({ id: obra.id })} disabled={deleteObra.isPending}>Confirmar Deleção</Button>
+            <Button size="sm" variant="ghost" className="text-white/60" onClick={() => setConfirmDeleteObraId(null)}>Cancelar</Button>
+          </div>
+        </div>
+      )}
       {changeAuthorObraId === obra.id && (
         <div className="mt-3 pt-3 border-t border-border">
           <p className="text-xs text-muted-foreground mb-2">ID do novo tradutor:</p>
@@ -811,3 +826,4 @@ function LojaTab({ onError }: { onError?: () => void }) {
     </div>
   );
 }
+
