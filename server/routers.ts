@@ -121,7 +121,7 @@ const obrasRouter = router({
   archive: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
+      if (!isSupremeAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Apenas o Admin Supremo pode arquivar obras." });
       const obra = await getObraById(input.id);
       if (!obra) throw new TRPCError({ code: "NOT_FOUND" });
       await updateObraStatus(input.id, "rejeitada");
@@ -132,7 +132,7 @@ const obrasRouter = router({
   deleteObra: protectedProcedure
     .input(z.object({ id: z.number() }))
     .mutation(async ({ ctx, input }) => {
-      if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
+      if (!isSupremeAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Apenas o Admin Supremo pode deletar obras." });
       const obra = await getObraById(input.id);
       if (!obra) throw new TRPCError({ code: "NOT_FOUND" });
       await deleteObra(input.id);
@@ -637,5 +637,4 @@ export const appRouter = router({
 });
 
 export type AppRouter = typeof appRouter;
-
 
