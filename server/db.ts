@@ -264,6 +264,24 @@ export async function updateObraAuthor(obraId: number, authorId: number) {
   const db = await getDb(); if (!db) return;
   await db.update(obras).set({ authorId, updatedAt: new Date() }).where(eq(obras.id, obraId));
 }
+export async function deleteObra(obraId: number) {
+  const db = await getDb(); if (!db) return;
+  // Buscar todos os capítulos da obra para deletar dados relacionados
+  const caps = await db.select({ id: capitulos.id }).from(capitulos).where(eq(capitulos.obraId, obraId));
+  const capIds = caps.map((c) => c.id);
+  // Deletar na ordem correta para evitar órfãos
+  if (capIds.length > 0) {
+    await db.delete(reports).where(sql`${reports.capituloId} = ANY(ARRAY[${sql.join(capIds.map(id => sql`${id}`), sql`, `)}]::int[])`);
+    await db.delete(historicoLeitura).where(sql`${historicoLeitura.capituloId} = ANY(ARRAY[${sql.join(capIds.map(id => sql`${id}`), sql`, `)}]::int[])`);
+  }
+  await db.delete(comentarios).where(eq(comentarios.obraId, obraId));
+  await db.delete(curtidas).where(eq(curtidas.obraId, obraId));
+  await db.delete(favoritos).where(eq(favoritos.obraId, obraId));
+  await db.delete(reports).where(eq(reports.obraId, obraId));
+  await db.delete(obraTransferRequests).where(eq(obraTransferRequests.obraId, obraId));
+  await db.delete(capitulos).where(eq(capitulos.obraId, obraId));
+  await db.delete(obras).where(eq(obras.id, obraId));
+}
 export async function incrementObraViews(obraId: number) {
   const db = await getDb(); if (!db) return;
   await db.update(obras).set({ viewsTotal: sql`${obras.viewsTotal} + 1`, viewsWeek: sql`${obras.viewsWeek} + 1` }).where(eq(obras.id, obraId));
