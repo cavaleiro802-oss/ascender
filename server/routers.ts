@@ -18,6 +18,7 @@ import {
   // Loja
   listLojaItens, createLojaItem, updateLojaItem, listUsuarioItens,
   comprarItem, equiparItem, desequiparItem, getMoedasUsuario, adicionarMoedas,
+  enviarMensagemChat, listarMensagensChat, deletarMensagemChat,
 } from "./db";
 
 // ─── Helpers de permissão ─────────────────────────────────────────────────────
@@ -607,6 +608,33 @@ const adminRouter = router({
     }),
 });
 
+// ─── Chat Router ──────────────────────────────────────────────────────────────
+const chatRouter = router({
+  mensagens: protectedProcedure.query(({ ctx }) => {
+    if (!isTranslatorOrAbove(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
+    return listarMensagensChat(50);
+  }),
+
+  enviar: protectedProcedure
+    .input(z.object({ conteudo: z.string().min(1).max(500) }))
+    .mutation(async ({ ctx, input }) => {
+      if (!isTranslatorOrAbove(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
+      if (ctx.user.bannedTotal || ctx.user.banned) throw new TRPCError({ code: "FORBIDDEN", message: "Sua conta está suspensa." });
+      const rl = checkRateLimit({ key: `chat:${ctx.user.id}`, windowMs: 5000, max: 3 });
+      if (!rl.allowed) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Devagar! Aguarde um momento." });
+      await enviarMensagemChat(ctx.user.id, input.conteudo);
+      return { success: true };
+    }),
+
+  deletar: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
+      await deletarMensagemChat(input.id);
+      return { success: true };
+    }),
+});
+
 // ─── App Router ───────────────────────────────────────────────────────────────
 export const appRouter = router({
   auth: router({
@@ -634,6 +662,7 @@ export const appRouter = router({
   notificacoes: notificacoesRouter,
   admin:        adminRouter,
   loja:         lojaRouter,
+  chat:         chatRouter,
 });
 
 export type AppRouter = typeof appRouter;
