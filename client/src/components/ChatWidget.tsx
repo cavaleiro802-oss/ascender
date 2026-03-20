@@ -30,7 +30,7 @@ function roleLevel(role: string) {
 }
 
 export default function ChatWidget() {
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const [aberto, setAberto] = useState(false);
   const [texto, setTexto] = useState("");
   const [novasMensagens, setNovasMensagens] = useState(0);
@@ -61,14 +61,12 @@ export default function ChatWidget() {
     onError: (e) => toast.error(e.message),
   });
 
-  // Scroll para o fim quando abre ou chegam mensagens
   useEffect(() => {
     if (aberto) {
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
     }
   }, [aberto, mensagens.length]);
 
-  // Contar novas mensagens quando fechado
   useEffect(() => {
     if (!mensagens.length) return;
     const ultimo = mensagens[mensagens.length - 1];
@@ -78,12 +76,12 @@ export default function ChatWidget() {
     setUltimoId(ultimo.id);
   }, [mensagens]);
 
-  // Zerar contador ao abrir
   useEffect(() => {
     if (aberto) setNovasMensagens(0);
   }, [aberto]);
 
-  if (!temAcesso) return null;
+  // Aguarda carregar — não retorna null permanentemente
+  if (isLoading || !temAcesso) return null;
 
   function handleEnviar() {
     const msg = texto.trim();
@@ -93,11 +91,9 @@ export default function ChatWidget() {
 
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2">
-      {/* Janela do chat */}
       {aberto && (
         <div className="w-80 sm:w-96 bg-card border border-border rounded-2xl shadow-2xl flex flex-col overflow-hidden"
           style={{ height: "420px" }}>
-          {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-secondary/50">
             <div className="flex items-center gap-2">
               <MessageCircle className="w-4 h-4 text-primary" />
@@ -109,7 +105,6 @@ export default function ChatWidget() {
             </Button>
           </div>
 
-          {/* Mensagens */}
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3">
             {mensagens.length === 0 ? (
               <div className="text-center text-muted-foreground text-sm mt-8">
@@ -123,7 +118,6 @@ export default function ChatWidget() {
                 const nome = msg.nome || msg.nomeGoogle || "Usuário";
                 return (
                   <div key={msg.id} className={`flex gap-2 group ${isMe ? "flex-row-reverse" : ""}`}>
-                    {/* Avatar */}
                     <div className="flex-shrink-0 w-7 h-7 rounded-full overflow-hidden bg-secondary">
                       {msg.avatarUrl ? (
                         <img src={msg.avatarUrl} alt={nome} className="w-full h-full object-cover" />
@@ -133,7 +127,6 @@ export default function ChatWidget() {
                         </div>
                       )}
                     </div>
-                    {/* Balão */}
                     <div className={`flex flex-col max-w-[75%] ${isMe ? "items-end" : "items-start"}`}>
                       <div className="flex items-center gap-1.5 mb-0.5">
                         <span className={`text-[10px] font-bold ${ROLE_COLOR[msg.role] ?? "text-white/50"}`}>
@@ -145,7 +138,6 @@ export default function ChatWidget() {
                         isMe ? "bg-primary rounded-tr-sm" : "bg-secondary rounded-tl-sm"
                       }`}>
                         {msg.conteudo}
-                        {/* Botão deletar (admin) */}
                         {isAdmin && (
                           <button
                             onClick={() => deletar.mutate({ id: msg.id })}
@@ -166,7 +158,6 @@ export default function ChatWidget() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Input */}
           <div className="px-3 py-3 border-t border-border bg-secondary/30 flex gap-2">
             <input
               ref={inputRef}
@@ -189,7 +180,6 @@ export default function ChatWidget() {
         </div>
       )}
 
-      {/* Botão flutuante */}
       <button
         onClick={() => setAberto((a) => !a)}
         className="w-14 h-14 bg-primary hover:bg-primary/90 rounded-full shadow-lg flex items-center justify-center transition-all hover:scale-105 relative"
