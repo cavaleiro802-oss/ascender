@@ -13,7 +13,7 @@ import {
   listFavoritos, listHistoricoAdm, listNotificacoes, listObras, listObrasByAuthor,
   listPedidosCargo, listPendingCapitulos, listPendingObras, listReports, listUsers,
   logAdm, marcarNotificacaoLida, resolveReport, setPublicLink, toggleCurtida,
-  toggleFavorito, updateCapituloStatus, updateObraAuthor, updateObraStatus,
+  toggleFavorito, updateCapituloStatus, updateObraAuthor, updateObraStatus, deleteObra,
   updateObra, updateUserProfile, updateUserRole, upsertHistoricoLeitura,
   // Loja
   listLojaItens, createLojaItem, updateLojaItem, listUsuarioItens,
@@ -115,6 +115,28 @@ const obrasRouter = router({
       if (!isSupremeAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN", message: "Apenas o Admin Supremo pode transferir autoria." });
       await updateObraAuthor(input.obraId, input.newAuthorId);
       await logAdm({ adminId: ctx.user.id, acao: "alterar_author_obra", detalhes: `Novo authorId: ${input.newAuthorId}`, targetType: "obra", targetId: input.obraId });
+      return { success: true };
+    }),
+
+  archive: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
+      const obra = await getObraById(input.id);
+      if (!obra) throw new TRPCError({ code: "NOT_FOUND" });
+      await updateObraStatus(input.id, "rejeitada");
+      await logAdm({ adminId: ctx.user.id, acao: "arquivar_obra", targetType: "obra", targetId: input.id });
+      return { success: true };
+    }),
+
+  deleteObra: protectedProcedure
+    .input(z.object({ id: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      if (!isAdmin(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
+      const obra = await getObraById(input.id);
+      if (!obra) throw new TRPCError({ code: "NOT_FOUND" });
+      await deleteObra(input.id);
+      await logAdm({ adminId: ctx.user.id, acao: "deletar_obra", targetType: "obra", targetId: input.id });
       return { success: true };
     }),
 
@@ -615,4 +637,5 @@ export const appRouter = router({
 });
 
 export type AppRouter = typeof appRouter;
+
 
