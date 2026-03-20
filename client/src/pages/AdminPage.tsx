@@ -534,8 +534,10 @@ function LogsTab() {
 function LinksTab() {
   const [telegramUrl, setTelegramUrl]   = useState("");
   const [emailContato, setEmailContato] = useState("");
+  const [discordUrl, setDiscordUrl]     = useState("");
   const { data: telegramLink } = trpc.admin.getPublicLink.useQuery({ key: "telegram" });
   const { data: emailLink }    = trpc.admin.getPublicLink.useQuery({ key: "email_contato" });
+  const { data: discordLink }  = trpc.admin.getPublicLink.useQuery({ key: "discord" });
   const setLink = trpc.admin.setPublicLink.useMutation({ onSuccess: () => toast.success("Salvo!"), onError: (e) => toast.error(e.message) });
   return (
     <div className="space-y-4 max-w-lg">
@@ -557,6 +559,15 @@ function LinksTab() {
           <div className="flex gap-2">
             <Input value={emailContato} onChange={(e) => setEmailContato(e.target.value)} placeholder="contato@seusite.com" type="email" className="bg-secondary border-border text-white placeholder:text-muted-foreground" />
             <Button className="bg-primary hover:bg-primary/90 text-white" onClick={() => setLink.mutate({ key: "email_contato", value: emailContato })} disabled={!emailContato.trim() || setLink.isPending}>Salvar</Button>
+          </div>
+        </div>
+        <div>
+          <Label className="text-white/80 mb-1.5 block">Link do Discord</Label>
+          <p className="text-xs text-muted-foreground mb-2">Aparece no rodapé do site.</p>
+          {discordLink && <p className="text-xs text-green-400 mb-2">Atual: {discordLink.value}</p>}
+          <div className="flex gap-2">
+            <Input value={discordUrl} onChange={(e) => setDiscordUrl(e.target.value)} placeholder="https://discord.gg/..." className="bg-secondary border-border text-white placeholder:text-muted-foreground" />
+            <Button className="bg-primary hover:bg-primary/90 text-white" onClick={() => setLink.mutate({ key: "discord", value: discordUrl })} disabled={!discordUrl.trim() || setLink.isPending}>Salvar</Button>
           </div>
         </div>
       </div>
