@@ -487,12 +487,15 @@ function AbaLote({ obraId, slug }: { obraId: string; slug: string }) {
   );
 }
 
-// ─── Aba Novel (texto) ────────────────────────────────────────────────────────
+// ─── Aba Novel (texto + imagens inline) ──────────────────────────────────────
 function AbaNovel({ obraId, slug }: { obraId: string; slug: string }) {
   const [, navigate] = useLocation();
   const [numero, setNumero] = useState("");
   const [title, setTitle] = useState("");
   const [conteudo, setConteudo] = useState("");
+  const [uploadingImg, setUploadingImg] = useState(false);
+  const imgRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const utils = trpc.useUtils();
 
   const criar = trpc.capitulos.create.useMutation({
@@ -503,6 +506,45 @@ function AbaNovel({ obraId, slug }: { obraId: string; slug: string }) {
     },
     onError: (e) => toast.error(e.message),
   });
+
+  async function handleImagemInline(file: File) {
+    if (!file.type.startsWith("image/")) return toast.error("Selecione uma imagem válida.");
+    if (file.size > 20 * 1024 * 1024) return toast.error("Imagem muito grande (máx 20MB).");
+    setUploadingImg(true);
+    try {
+      const presignRes = await fetch("/api/upload/presign", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          arquivos: [{ tipo: file.type, tamanho: file.size }],
+          obraId: parseInt(obraId),
+          pasta: "obras",
+        }),
+      });
+      if (!presignRes.ok) throw new Error("Erro ao obter URL de upload.");
+      const { urls } = await presignRes.json();
+      const { uploadUrl, publicUrl } = urls[0];
+      const uploadRes = await fetch(uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      if (!uploadRes.ok) throw new Error("Erro ao enviar imagem.");
+      const tag = `\n[img:${publicUrl}]\n`;
+      const el = textareaRef.current;
+      if (el) {
+        const start = el.selectionStart ?? conteudo.length;
+        const novoConteudo = conteudo.slice(0, start) + tag + conteudo.slice(start);
+        setConteudo(novoConteudo);
+        setTimeout(() => { el.selectionStart = el.selectionEnd = start + tag.length; el.focus(); }, 0);
+      } else {
+        setConteudo((c) => c + tag);
+      }
+      toast.success("Imagem inserida!");
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setUploadingImg(false);
+      if (imgRef.current) imgRef.current.value = "";
+    }
+  }
 
   async function handleSubmit() {
     if (!numero || isNaN(parseFloat(numero))) return toast.error("Número do capítulo obrigatório.");
@@ -516,6 +558,7 @@ function AbaNovel({ obraId, slug }: { obraId: string; slug: string }) {
   }
 
   const palavras = conteudo.trim() ? conteudo.trim().split(/\s+/).length : 0;
+  const numImagens = (conteudo.match(/\[img:/g) || []).length;
 
   return (
     <div className="space-y-6">
@@ -533,26 +576,40 @@ function AbaNovel({ obraId, slug }: { obraId: string; slug: string }) {
       </div>
 
       <div>
-        <div className="flex items-center justify-between mb-1.5">
+        <div className="flex items-center justify-between mb-1.5 flex-wrap gap-2">
           <Label className="text-white/80">Conteúdo *</Label>
-          <span className="text-xs text-muted-foreground">{palavras} palavras · {conteudo.length}/500000 chars</span>
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-muted-foreground">{palavras} palavras · {numImagens} img · {conteudo.length}/500000</span>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="border-primary/40 text-primary hover:bg-primary/10 bg-transparent text-xs h-7 gap-1"
+              onClick={() => imgRef.current?.click()}
+              disabled={uploadingImg}
+            >
+              {uploadingImg ? <Loader2 className="w-3 h-3 animate-spin" /> : <ImagePlus className="w-3 h-3" />}
+              {uploadingImg ? "Enviando..." : "Inserir Imagem"}
+            </Button>
+          </div>
         </div>
         <textarea
+          ref={textareaRef}
           value={conteudo}
           onChange={(e) => setConteudo(e.target.value)}
           maxLength={500000}
           rows={20}
-          placeholder="Cole ou escreva o texto do capítulo aqui...
-
-Cada linha em branco vira uma quebra de parágrafo na leitura."
+          placeholder={"Cole ou escreva o texto do capítulo aqui...\n\nUse o botão \'Inserir Imagem\' para adicionar ilustrações entre os parágrafos."}
           className="w-full px-4 py-3 bg-secondary border border-border rounded-xl text-white placeholder:text-muted-foreground text-sm leading-relaxed resize-y focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-primary font-mono"
         />
+        <input ref={imgRef} type="file" accept="image/*" className="hidden"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) handleImagemInline(f); }} />
         <p className="text-xs text-muted-foreground mt-1">
-          💡 Cole direto do Google Docs, Word ou qualquer editor. Quebras de parágrafo são preservadas.
+          💡 Posicione o cursor no texto onde quer inserir a imagem, depois clique em "Inserir Imagem".
         </p>
       </div>
 
-      <Button onClick={handleSubmit} disabled={criar.isPending}
+      <Button onClick={handleSubmit} disabled={criar.isPending || uploadingImg}
         className="w-full bg-primary hover:bg-primary/90 text-white h-11 text-base font-bold">
         {criar.isPending ? (
           <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Salvando...</>
