@@ -15,7 +15,7 @@ export const capStatusEnum     = pgEnum("cap_status",     ["aguardando", "aprova
 export const reportTipoEnum    = pgEnum("report_tipo",    ["imagem_faltando", "cap_nao_carrega", "erro_traducao", "outro"]);
 export const pedidoTipoEnum    = pgEnum("pedido_tipo",    ["quero_aprender", "posso_ajudar"]);
 export const pedidoStatusEnum  = pgEnum("pedido_status",  ["pendente", "aprovado", "rejeitado"]);
-export const notifTipoEnum     = pgEnum("notif_tipo",     ["cargo_aprovado", "cargo_rejeitado", "bem_vindo_equipe", "resposta_comentario"]);
+export const notifTipoEnum     = pgEnum("notif_tipo",     ["cargo_aprovado", "cargo_rejeitado", "bem_vindo_equipe", "resposta_comentario", "pedido_cargo"]);
 export const transferStatusEnum = pgEnum("transfer_status", ["pendente", "aprovado", "rejeitado"]);
 
 // Loja
@@ -321,5 +321,6 @@ export const moedasTransacoes = pgTable("moedas_transacoes", {
   userIdx: index("moedas_user_idx").on(t.userId),
 }));
 export type MoedasTransacao = typeof moedasTransacoes.$inferSelect;
+
 
 
