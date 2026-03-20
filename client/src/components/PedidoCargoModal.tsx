@@ -28,7 +28,7 @@ export default function PedidoCargoModal({ onClose }: Props) {
     onError: (e) => toast.error(e.message),
   });
 
-  // Verifica se ainda está no cooldown de 10 dias
+  // Verifica se ainda está no cooldown de 1 dia
   const emCooldown = meuPedido && meuPedido.bloqueadoAte && new Date(meuPedido.bloqueadoAte) > new Date();
   const diasRestantes = emCooldown
     ? Math.ceil((new Date(meuPedido.bloqueadoAte!).getTime() - Date.now()) / (1000 * 60 * 60 * 24))
@@ -123,7 +123,7 @@ export default function PedidoCargoModal({ onClose }: Props) {
               )}
 
               <p className="text-xs text-muted-foreground">
-                ⚠️ Você pode enviar apenas 1 pedido a cada 1 dias.
+                ⚠️ Você pode enviar apenas 1 pedido a cada 1 dia.
               </p>
 
               <Button
