@@ -140,13 +140,16 @@ export default function CapituloPage() {
         {isNovel ? (
           <div className="max-w-2xl mx-auto px-5 py-8 pb-24">
             <div className="prose prose-invert prose-lg max-w-none">
-              {((capitulo as any).conteudo as string).split("\n").map((paragrafo, i) =>
-                paragrafo.trim() === "" ? (
-                  <div key={i} className="h-4" />
-                ) : (
-                  <p key={i} className="text-white/85 leading-relaxed text-base mb-0">{paragrafo}</p>
-                )
-              )}
+              {((capitulo as any).conteudo as string).split("\n").map((paragrafo, i) => {
+                if (paragrafo.trim() === "") return <div key={i} className="h-4" />;
+                const imgMatch = paragrafo.trim().match(/^\[img:(.+)\]$/);
+                if (imgMatch) return (
+                  <div key={i} className="my-6 flex justify-center">
+                    <img src={imgMatch[1]} alt="Ilustração" className="max-w-full rounded-lg shadow-lg" loading="lazy" />
+                  </div>
+                );
+                return <p key={i} className="text-white/85 leading-relaxed text-base mb-0">{paragrafo}</p>;
+              })}
             </div>
           </div>
         ) : paginas.length === 0 ? (
