@@ -323,3 +323,15 @@ export const moedasTransacoes = pgTable("moedas_transacoes", {
 export type MoedasTransacao = typeof moedasTransacoes.$inferSelect;
 
 
+// ─── Chat da Equipe ───────────────────────────────────────────────────────────
+export const chatMensagens = pgTable("chat_mensagens", {
+  id:        integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  userId:    integer("userId").notNull(),
+  conteudo:  text("conteudo").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+}, (t) => ({
+  userIdx:      index("chat_user_idx").on(t.userId),
+  createdAtIdx: index("chat_created_idx").on(t.createdAt),
+}));
+export type ChatMensagem = typeof chatMensagens.$inferSelect;
+
