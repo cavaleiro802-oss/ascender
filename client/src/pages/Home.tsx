@@ -479,7 +479,7 @@ export default function Home() {
             <Carrossel obras={mostObras} titulo="Mais Lidos" icone={<Eye className="w-5 h-5 text-blue-400" />} onObraClick={(obra: any) => goObra(obra.slug ?? String(obra.id))} />
 
             {/* Banner ASCENDER — só no painel central, abaixo dos carrosséis */}
-            {showBanner && <PropagandaBanner onClose={closeBanner} onAction={(acao) => { if (acao === "pedido_cargo") setShowPedidoModal(true); }} />}
+            {showBanner && <PropagandaBanner onClose={closeBanner} onAction={(acao) => { if (acao === "pedido_cargo") { if (!isAuthenticated) { navigate("/login"); } else { setShowPedidoModal(true); } } }} />}
           </>
         )}
 
@@ -544,4 +544,5 @@ export default function Home() {
       }
 
        
+
 
