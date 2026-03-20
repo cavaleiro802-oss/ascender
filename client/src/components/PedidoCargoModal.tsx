@@ -123,7 +123,7 @@ export default function PedidoCargoModal({ onClose }: Props) {
               )}
 
               <p className="text-xs text-muted-foreground">
-                ⚠️ Você pode enviar apenas 1 pedido a cada 10 dias.
+                ⚠️ Você pode enviar apenas 1 pedido a cada 1 dias.
               </p>
 
               <Button
