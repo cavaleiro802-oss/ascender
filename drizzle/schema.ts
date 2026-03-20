@@ -323,4 +323,3 @@ export const moedasTransacoes = pgTable("moedas_transacoes", {
 export type MoedasTransacao = typeof moedasTransacoes.$inferSelect;
 
 
-
