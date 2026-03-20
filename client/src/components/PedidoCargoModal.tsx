@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "./ui/button";
 import { Textarea } from "./ui/textarea";
 import { toast } from "sonner";
@@ -13,7 +14,11 @@ export default function PedidoCargoModal({ onClose }: Props) {
   const [tipo, setTipo] = useState<"quero_aprender" | "posso_ajudar" | null>(null);
   const [mensagem, setMensagem] = useState("");
 
-  const { data: meuPedido } = trpc.pedidoCargo.meuPedidoRecente.useQuery();
+  const { user, isAuthenticated } = useAuth();
+  const { data: meuPedido } = trpc.pedidoCargo.meuPedidoRecente.useQuery(
+    undefined,
+    { enabled: isAuthenticated }
+  );
 
   const enviar = trpc.pedidoCargo.criar.useMutation({
     onSuccess: () => {
