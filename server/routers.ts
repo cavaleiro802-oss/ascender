@@ -620,7 +620,7 @@ const chatRouter = router({
     .mutation(async ({ ctx, input }) => {
       if (!isTranslatorOrAbove(ctx.user.role)) throw new TRPCError({ code: "FORBIDDEN" });
       if (ctx.user.bannedTotal || ctx.user.banned) throw new TRPCError({ code: "FORBIDDEN", message: "Sua conta está suspensa." });
-      const rl = checkRateLimit({ key: `chat:${ctx.user.id}`, windowMs: 5000, max: 3 });
+      const rl = checkRateLimit({ key: `chat:${ctx.user.id}`, windowMs: 5000, maxRequests: 3 });
       if (!rl.allowed) throw new TRPCError({ code: "TOO_MANY_REQUESTS", message: "Devagar! Aguarde um momento." });
       await enviarMensagemChat(ctx.user.id, input.conteudo);
       return { success: true };
