@@ -120,7 +120,7 @@ export async function avaliarPedidoCargo(data: { pedidoId: number; adminId: numb
 }
 
 // ─── Notificações ────────────────────────────────────────────────────────────
-export async function criarNotificacao(data: { userId: number; tipo: "cargo_aprovado" | "cargo_rejeitado" | "bem_vindo_equipe" | "resposta_comentario"; titulo: string; mensagem: string }) {
+export async function criarNotificacao(data: { userId: number; tipo: "cargo_aprovado" | "cargo_rejeitado" | "bem_vindo_equipe" | "resposta_comentario" | "pedido_cargo"; titulo: string; mensagem: string }) {
   const db = await getDb(); if (!db) return;
   await db.insert(notificacoes).values(data);
 }
@@ -699,3 +699,4 @@ export async function adicionarMoedas(userId: number, valor: number, descricao: 
   await db.update(users).set({ moedas: sql`${users.moedas} + ${valor}`, updatedAt: new Date() }).where(eq(users.id, userId));
   await db.insert(moedasTransacoes).values({ userId, valor, tipo: "recarga", descricao });
 }
+
