@@ -6,7 +6,7 @@ import {
   InsertUser, sessoes, capitulos, comentarios, curtidas, favoritos,
   historicoAdm, historicoLeitura, notificacoes, obras, obraTransferRequests,
   featureFlags, pedidosCargo, publicLinks, reports, users,
-  lojaItens, usuarioItens, moedasTransacoes,
+  lojaItens, usuarioItens, moedasTransacoes, chatMensagens,
 } from "../drizzle/schema";
 import * as schema from "../drizzle/schema";
 
@@ -716,5 +716,34 @@ export async function adicionarMoedas(userId: number, valor: number, descricao: 
   const db = await getDb(); if (!db) return;
   await db.update(users).set({ moedas: sql`${users.moedas} + ${valor}`, updatedAt: new Date() }).where(eq(users.id, userId));
   await db.insert(moedasTransacoes).values({ userId, valor, tipo: "recarga", descricao });
+}
+
+// ─── Chat da Equipe ───────────────────────────────────────────────────────────
+export async function enviarMensagemChat(userId: number, conteudo: string) {
+  const db = await getDb(); if (!db) return;
+  await db.insert(chatMensagens).values({ userId, conteudo });
+}
+export async function listarMensagensChat(limite = 50) {
+  const db = await getDb(); if (!db) return [];
+  const msgs = await db
+    .select({
+      id:          chatMensagens.id,
+      conteudo:    chatMensagens.conteudo,
+      createdAt:   chatMensagens.createdAt,
+      userId:      users.id,
+      nome:        users.displayName,
+      nomeGoogle:  users.name,
+      avatarUrl:   users.avatarUrl,
+      role:        users.role,
+    })
+    .from(chatMensagens)
+    .innerJoin(users, eq(chatMensagens.userId, users.id))
+    .orderBy(desc(chatMensagens.createdAt))
+    .limit(limite);
+  return msgs.reverse();
+}
+export async function deletarMensagemChat(id: number) {
+  const db = await getDb(); if (!db) return;
+  await db.delete(chatMensagens).where(eq(chatMensagens.id, id));
 }
 
