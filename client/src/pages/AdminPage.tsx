@@ -140,8 +140,9 @@ function StatsTab() {
 // ─── Obras Tab ────────────────────────────────────────────────────────────────
 function ObrasTab({ isSupreme }: { isSupreme: boolean }) {
   const utils = trpc.useUtils();
+  const [pageAll, setPageAll] = useState(1);
   const { data: pending = [] }  = trpc.obras.pending.useQuery();
-  const { data: allObras = [] } = trpc.obras.listAll.useQuery({ status: "aprovada" });
+  const { data: allObras = [] } = trpc.obras.listAll.useQuery({ status: "aprovada", page: pageAll });
   const [changeAuthorObraId, setChangeAuthorObraId] = useState<number | null>(null);
   const [newAuthorId, setNewAuthorId] = useState("");
   const [confirmDeleteObraId, setConfirmDeleteObraId] = useState<number | null>(null);
@@ -246,7 +247,20 @@ function ObrasTab({ isSupreme }: { isSupreme: boolean }) {
       )}
 
       {tab === "pending" && (pending.length === 0 ? <div className="asc-card p-8 text-center text-muted-foreground">Nenhuma obra pendente.</div> : pending.map((o: any) => renderObraCard(o, true)))}
-      {tab === "all"     && (allObras.length === 0 ? <div className="asc-card p-8 text-center text-muted-foreground">Nenhuma obra aprovada.</div>  : allObras.map((o: any) => renderObraCard(o, false)))}
+      {tab === "all" && (
+        <>
+          {allObras.length === 0 ? (
+            <div className="asc-card p-8 text-center text-muted-foreground">Nenhuma obra aprovada.</div>
+          ) : (
+            allObras.map((o: any) => renderObraCard(o, false))
+          )}
+          <div className="flex items-center justify-center gap-3 mt-4">
+            <Button size="sm" variant="outline" className="border-border bg-transparent text-white/60" onClick={() => setPageAll((p) => Math.max(1, p - 1))} disabled={pageAll === 1}>← Anterior</Button>
+            <span className="text-xs text-muted-foreground">Página {pageAll}</span>
+            <Button size="sm" variant="outline" className="border-border bg-transparent text-white/60" onClick={() => setPageAll((p) => p + 1)} disabled={allObras.length < 20}>Próxima →</Button>
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -837,4 +851,5 @@ function LojaTab({ onError }: { onError?: () => void }) {
     </div>
   );
 }
+
 
