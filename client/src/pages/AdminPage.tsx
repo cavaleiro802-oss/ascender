@@ -141,12 +141,14 @@ function StatsTab() {
 function ObrasTab({ isSupreme }: { isSupreme: boolean }) {
   const utils = trpc.useUtils();
   const [pageAll, setPageAll] = useState(1);
-  const { data: pending = [] }  = trpc.obras.pending.useQuery();
-  const { data: allObras = [] } = trpc.obras.listAll.useQuery({ status: "aprovada", page: pageAll });
+  const [pageArq, setPageArq] = useState(1);
+  const { data: pending = [] }    = trpc.obras.pending.useQuery();
+  const { data: allObras = [] }   = trpc.obras.listAll.useQuery({ status: "aprovada", page: pageAll });
+  const { data: arquivadas = [] } = trpc.obras.listAll.useQuery({ status: "rejeitada", page: pageArq });
   const [changeAuthorObraId, setChangeAuthorObraId] = useState<number | null>(null);
   const [newAuthorId, setNewAuthorId] = useState("");
   const [confirmDeleteObraId, setConfirmDeleteObraId] = useState<number | null>(null);
-  const [tab, setTab] = useState<"pending" | "all" | "tradutor">("pending");
+  const [tab, setTab] = useState<"pending" | "all" | "arquivadas" | "tradutor">("pending");
   const [buscaTradutor, setBuscaTradutor] = useState("");
   const [translatorIdBusca, setTranslatorIdBusca] = useState<number | null>(null);
   const { data: obrasTradutor = [] } = trpc.obras.byTranslatorId.useQuery(
@@ -175,7 +177,12 @@ function ObrasTab({ isSupreme }: { isSupreme: boolean }) {
             </>
           )}
           <Button size="sm" variant="outline" className="border-border bg-transparent text-white/60 text-xs" onClick={() => setChangeAuthorObraId(changeAuthorObraId === obra.id ? null : obra.id)}>Trocar Dono</Button>
-          <Button size="sm" variant="outline" className="border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10 bg-transparent text-xs" onClick={() => archive.mutate({ id: obra.id })} disabled={archive.isPending}>📦 Arquivar</Button>
+          {obra.status !== "rejeitada" && (
+            <Button size="sm" variant="outline" className="border-yellow-500/40 text-yellow-400 hover:bg-yellow-500/10 bg-transparent text-xs" onClick={() => archive.mutate({ id: obra.id })} disabled={archive.isPending}>📦 Arquivar</Button>
+          )}
+          {obra.status === "rejeitada" && (
+            <Button size="sm" variant="outline" className="border-green-500/40 text-green-400 hover:bg-green-500/10 bg-transparent text-xs" onClick={() => approve.mutate({ id: obra.id, status: "aprovada" })} disabled={approve.isPending}>♻️ Restaurar</Button>
+          )}
           <Button size="sm" variant="outline" className="border-red-500/40 text-red-500 hover:bg-red-500/10 bg-transparent text-xs" onClick={() => setConfirmDeleteObraId(obra.id)}>🗑️ Deletar</Button>
         </div>
       </div>
@@ -208,6 +215,7 @@ function ObrasTab({ isSupreme }: { isSupreme: boolean }) {
         <Button size="sm" onClick={() => setTab("pending")}  className={tab === "pending"  ? "bg-primary text-white" : "bg-secondary text-white/60 border-border border"}>Pendentes ({pending.length})</Button>
         <Button size="sm" onClick={() => setTab("all")}      className={tab === "all"      ? "bg-primary text-white" : "bg-secondary text-white/60 border-border border"}>Todas ({allObras.length})</Button>
         <Button size="sm" onClick={() => setTab("tradutor")} className={tab === "tradutor" ? "bg-purple-600 text-white" : "bg-secondary text-white/60 border-border border"}>Por Tradutor</Button>
+        <Button size="sm" onClick={() => setTab("arquivadas")} className={tab === "arquivadas" ? "bg-yellow-600 text-white" : "bg-secondary text-white/60 border-border border"}>📦 Arquivadas ({arquivadas.length})</Button>
       </div>
 
       {/* [11] Busca por ID do tradutor */}
@@ -258,6 +266,20 @@ function ObrasTab({ isSupreme }: { isSupreme: boolean }) {
             <Button size="sm" variant="outline" className="border-border bg-transparent text-white/60" onClick={() => setPageAll((p) => Math.max(1, p - 1))} disabled={pageAll === 1}>← Anterior</Button>
             <span className="text-xs text-muted-foreground">Página {pageAll}</span>
             <Button size="sm" variant="outline" className="border-border bg-transparent text-white/60" onClick={() => setPageAll((p) => p + 1)} disabled={allObras.length < 20}>Próxima →</Button>
+          </div>
+        </>
+      )}
+      {tab === "arquivadas" && (
+        <>
+          {arquivadas.length === 0 ? (
+            <div className="asc-card p-8 text-center text-muted-foreground">Nenhuma obra arquivada.</div>
+          ) : (
+            arquivadas.map((o: any) => renderObraCard(o, false))
+          )}
+          <div className="flex items-center justify-center gap-3 mt-4">
+            <Button size="sm" variant="outline" className="border-border bg-transparent text-white/60" onClick={() => setPageArq((p) => Math.max(1, p - 1))} disabled={pageArq === 1}>← Anterior</Button>
+            <span className="text-xs text-muted-foreground">Página {pageArq}</span>
+            <Button size="sm" variant="outline" className="border-border bg-transparent text-white/60" onClick={() => setPageArq((p) => p + 1)} disabled={arquivadas.length < 20}>Próxima →</Button>
           </div>
         </>
       )}
